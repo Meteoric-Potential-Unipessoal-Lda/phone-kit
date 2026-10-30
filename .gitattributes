@@ -1,0 +1,10 @@
+# Байты файлов набора важны: Windows PowerShell 5.1 читает .ps1 без BOM как ANSI, .bat нужен CRLF, start.command — LF.
+*.ps1     -text
+*.bat     -text
+*.txt     -text
+*.tsv     -text
+*.command text eol=lf
+*.sh      text eol=lf
+*.py      text eol=lf
+*.yml     text eol=lf
+*.md      text eol=lf
