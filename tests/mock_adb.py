@@ -69,7 +69,16 @@ def shell(cmd):
     if cmd == 'dumpsys battery': return 'Current Battery Service state:\n  AC powered: false\n  USB powered: true\n  level: 64\n  temperature: 412\n  health: 2'
     if cmd == 'dumpsys thermalservice': return 'IsStatusOverride: false\nThermal Status: 1\nCurrent temperatures from HAL:\n\tTemperature{mValue=41.2, mType=2, mName=battery, mStatus=0}\n\tTemperature{mValue=55.0, mType=0, mName=cpu0, mStatus=1}\nCurrent cooling devices from HAL:'
     if cmd == 'dumpsys diskstats':
-        return 'Latency: 2ms [512B Data Write]\nData-Free: 2500000K / 25000000K total = 10% free\nApp Package Names: ["com.whatsapp","com.android.chrome","com.oldgame.idle"]\nApp Sizes: [60000000,200000000,500000000]\nApp Data Sizes: [3000000000,400000000,50000000]\nCache Sizes: [500000000,700000000,10000000]\nPhotos Size: 1'
+        return 'Latency: 2ms [512B Data Write]\nData-Free: 2500000K / 25000000K total = 10% free\nApp Package Names: ["com.whatsapp","com.android.chrome","com.oldgame.idle"]\nApp Sizes: [60000000,200000000,500000000]\nApp Data Sizes: [3000000000,400000000,50000000]\nCache Sizes: [500000000,700000000,10000000]\nPhotos Size: 6000000000\nVideos Size: 3500000000\nAudio Size: 200000000\nDownloads Size: 1500000000\nApp Size: 4000000000\nApp Data Size: 5000000000\nApp Cache Size: 1200000000\nSystem Size: 9000000000\nOther Size: 800000000'
+    if cmd == 'pm list packages -U':
+        return 'package:com.google.android.youtube uid:10150\npackage:com.whatsapp uid:10200\npackage:com.android.chrome uid:10099'
+    if cmd == 'dumpsys batterystats':
+        return ('Battery History:\n  ...\nStatistics since last charge:\n  System starts: 3, currently on battery: true\n  Time on battery: 5h 12m 3s 0ms (100.0%) realtime, 2h 1m uptime\n\n'
+                '  Estimated power use (mAh):\n    Capacity: 5000, Computed drain: 1500, actual drain: 1400-1500\n    Screen: 400\n'
+                '    Uid u0a150: 420.5 ( cpu=100 wake=5 )\n    Uid 1000: 300\n    Uid u0a200: 120.1\n    Uid u0a99: 60\n\n'
+                '  All kernel wake locks:\n    Uid u0a150: 999\n')
+    if a[:4] == ['du', '-s', '-k', '/sdcard/Android/media/com.whatsapp/WhatsApp/Media']:
+        return '2500000\t/sdcard/Android/media/com.whatsapp/WhatsApp/Media\n1300000\t/sdcard/Telegram\n8000000\t/sdcard/DCIM\n1200000\t/sdcard/Download'
     if a[:3] == ['pm', 'list', 'packages']:
         fl = ''.join(x.strip('-') for x in a[3:])
         inst = installed()

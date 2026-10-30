@@ -13,10 +13,20 @@ if os.name == 'nt':
     open(wrap, 'w').write('@"%s" "%s" %%*\n' % (sys.executable, adb))
     adb = wrap
 env = dict(os.environ, MOCK_BRAND='samsung', MOCK_STATE=os.path.join(work, 'state.json'))
+# подставной GitHub: «вышла версия 9.9»
+import http.server, threading
+class Rel(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        b = json.dumps({'tag_name': 'v9.9', 'html_url': 'https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/tag/v9.9'}).encode()
+        self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b)
+    def log_message(self, *a): pass
+rel = http.server.HTTPServer(('127.0.0.1', 0), Rel)
+threading.Thread(target=rel.serve_forever, daemon=True).start()
+upd_url = 'http://127.0.0.1:%d/latest' % rel.server_address[1]
 out = open(os.path.join(work, 'out.log'), 'wb')
 p = subprocess.Popen([shell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', os.path.join(kit, 'phonekit.ps1'),
-                      '-AdbPath', adb, '-Web', '-NoBrowser', '-Lang', 'ru'] if os.name == 'nt' else
-                     [shell, '-NoProfile', '-File', os.path.join(kit, 'phonekit.ps1'), '-AdbPath', adb, '-Web', '-NoBrowser', '-Lang', 'ru'],
+                      '-AdbPath', adb, '-Web', '-NoBrowser', '-Lang', 'ru', '-UpdateUrl', upd_url] if os.name == 'nt' else
+                     [shell, '-NoProfile', '-File', os.path.join(kit, 'phonekit.ps1'), '-AdbPath', adb, '-Web', '-NoBrowser', '-Lang', 'ru', '-UpdateUrl', upd_url],
                      stdin=subprocess.PIPE, stdout=out, stderr=subprocess.STDOUT, env=env)
 def fail(msg):
     print('FAIL', msg)
@@ -66,13 +76,19 @@ while time.time() < deadline:
 else:
     fail('timeout')
 types = [e['type'] for e in events]
-for t in ('stage', 'device', 'summary', 'report', 'finished'):
+for t in ('stage', 'device', 'summary', 'report', 'finished', 'update', 'client'):
     if t not in types: fail('no %s event' % t)
 summ = [e['data'] for e in events if e['type'] == 'summary'][0]
 if not (0 < int(summ['dataPct']) <= 100): fail('summary dataPct %s' % summ['dataPct'])
 de = json.load(open(os.path.join(ROOT, 'data', 'lang', 'de.json'), encoding='utf-8'))
 prefix = de['m435'].split('{0}')[0].strip()
 if not any(e['type'] == 'log' and str(e['data'].get('t', '')).strip().startswith(prefix) for e in events): fail('language switch did not apply (no "%s")' % prefix)
+if [e['data'] for e in events if e['type'] == 'update'][0]['version'] != '9.9': fail('update version')
+st_sum = [e['data'] for e in events if e['type'] == 'summary'][0]
+if not st_sum.get('storage') or not st_sum['storage'].get('tips'): fail('no storage tips in summary')
+if not st_sum.get('battery') or not st_sum['battery'].get('apps'): fail('no battery apps in summary')
+ch = urllib.request.urlopen(base + '/api/client?t=' + token, timeout=10).read().decode('utf-8')
+if 'phone-kit' not in ch or '<html' not in ch: fail('client report not served')
 rep = [e['data'] for e in events if e['type'] == 'report'][0]
 if not os.path.exists(rep['zip']): fail('report zip missing')
 post('/api/close', {})

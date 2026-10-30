@@ -16,7 +16,7 @@ run() {
   cp "$ROOT/phonekit.ps1" "$kit/"; cp "$ROOT"/data/*.tsv "$kit/data/"; mkdir -p "$kit/data/lang"; cp "$ROOT"/data/lang/*.json "$kit/data/lang/"
   export MOCK_BRAND=$brand MOCK_STATE="$WORK/$brand.json"
   [ -z "$keep" ] && rm -f "$MOCK_STATE"
-  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoPause > "$WORK/$name.log" 2>&1
+  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoUpdateCheck -NoPause > "$WORK/$name.log" 2>&1
 }
 # expect NAME "текст" — текст должен быть в выводе; reject NAME "текст" — не должен
 expect() { if grep -qF -- "$2" "$WORK/$1.log"; then echo "PASS $1: $2"; else echo "FAIL $1: нет «$2»"; FAIL=1; fi; }
@@ -28,6 +28,7 @@ nostate() { if grep -qF -- "$2" "$WORK/$1.json"; then echo "FAIL state $1: ес�
 run s_diag samsung '1\nТест\n'
 expect s_diag 'Архив:'
 expect s_diag 'подозрительное: com.hidden.spy.svc'
+expect s_diag 'Отчёт для клиента:'
 reject s_diag 'Exception'
 nostate samsung 'rubin'
 
@@ -37,7 +38,7 @@ expect s_opt 'отключён com.samsung.android.rubin.app'
 expect s_opt 'после перезагрузки всё отключённое осталось отключённым'
 reject s_opt 'kgclient'
 state samsung 'com.samsung.android.rubin.app'
-run s_rest samsung '3\n\nда\n' keep
+run s_rest samsung '3\n\n\nда\n' keep
 expect s_rest 'откат завершён'
 nostate samsung 'rubin'
 
@@ -46,7 +47,16 @@ run x_opt xiaomi '2\nРедми\n2\n\nда\n\n\n'
 expect x_opt 'убран для пользователя com.miui.msa.global'
 expect x_opt 'частный DNS -> dns.adguard-dns.com'
 state xiaomi 'com.miui.msa.global'
-run x_rest xiaomi '3\n\nда\n' keep
+grep -q '12. БЫЛО / СТАЛО' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: было / стало" || { echo "FAIL x_opt: нет «было / стало»"; FAIL=1; }
+grep -q 'Что занимает память' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: раздел памяти" || { echo "FAIL x_opt: нет раздела памяти"; FAIL=1; }
+grep -q 'Расход батареи по приложениям' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: расход батареи" || { echo "FAIL x_opt: нет расхода батареи"; FAIL=1; }
+ls "$WORK"/kit-xiaomi/reports/*/client_report.html >/dev/null 2>&1 && echo "PASS x_opt: отчёт для клиента" || { echo "FAIL x_opt: нет client_report.html"; FAIL=1; }
+# 3б. Выборочный откат: только запись 1 (настройка анимации), остальное остаётся в журнале
+run x_part xiaomi '3\n\n1\nда\n' keep
+expect x_part 'Откатываю выбранные: 1 из'
+expect x_part 'В журнале осталось записей'
+state xiaomi 'com.miui.msa.global'
+run x_rest xiaomi '3\n\n\nда\n' keep
 expect x_rest 'возвращён com.miui.msa.global'
 nostate xiaomi 'msa.global'
 nostate xiaomi 'adguard'
@@ -62,8 +72,8 @@ expect x_dns 'не работает в этой сети'
 nostate xiaomi 'adguard'
 
 # 5б. План: номер у отмеченного снимает галочку -> подсказка и предупреждение перед «да»; «нет» -> ничего не менялось
-run x_tog xiaomi '2\nТ\n6-15\n\nнет\n'
-expect x_tog 'Галочка СНЯТА (не будет сделано): 6 7 8 9 10 11 12 13 14 15'
+run x_tog xiaomi '2\nТ\n7-16\n\nнет\n'
+expect x_tog 'Галочка СНЯТА (не будет сделано): 7 8 9 10 11 12 13 14 15 16'
 expect x_tog 'С 10 пунктов «реклама, сбор данных, мусор» галочка снята'
 expect x_tog 'Отменено — ничего не менялось'
 nostate xiaomi 'msa.global'
