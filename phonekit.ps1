@@ -20,6 +20,7 @@
     -Lang en             язык (ru uk en pt es fr it de lv pl); по умолчанию — язык системы
     -Console             только консоль, без страницы в браузере
     -Web -NoBrowser      страница без автозапуска браузера (адрес печатается в консоли)
+    -NoUpdateCheck       не проверять новую версию на GitHub
 
   База пакетов (data/uad.tsv) — из Universal Android Debloater Next Generation
   (github.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation, GPL-3.0),
@@ -34,12 +35,14 @@ param(
   [switch]$Console,
   [switch]$Web,
   [switch]$NoBrowser,
+  [switch]$NoUpdateCheck,
+  [string]$UpdateUrl = '',
   [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '0.9'
+$KitVersion = '1.0'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -183,6 +186,11 @@ $WebServer = {
           $resp = [ordered]@{ seq = $W.seq; events = $evs.ToArray(); question = $W.question; lang = $W.lang; finished = [bool]$W.finished; kit = $W.kit }
         } finally { [System.Threading.Monitor]::Exit($W.SyncRoot) }
         SendText $c 200 'application/json; charset=utf-8' ($resp | ConvertTo-Json -Depth 10 -Compress); continue
+      }
+      if ($path -eq '/api/client' -and $method -eq 'GET') {
+        $cf = [string]$W.clientFile
+        if ($cf -and (Test-Path -LiteralPath $cf)) { Send $c 200 'text/html; charset=utf-8' ([IO.File]::ReadAllBytes($cf)) } else { SendText $c 404 'text/plain' 'no report yet' }
+        continue
       }
       if ($path -eq '/api/lang' -and $method -eq 'GET') {
         $code = [string]$qs['code']
@@ -331,7 +339,10 @@ $ReadOnlyPatterns = @(
   '^cmd appops get [A-Za-z0-9_.]+ [A-Z_]+$',
   '^settings get (system|secure|global) [A-Za-z0-9_.]+$',
   '^logcat -d -b crash -t \d+$',
-  '^wm (size|density)$'
+  '^wm (size|density)$',
+  '^dumpsys batterystats$',
+  '^pm list packages -U$',
+  '^du -s -k( /sdcard/[A-Za-z0-9_./-]+)+$'
 )
 function Test-ReadOnly([string]$cmd) {
   if ($cmd -match '[;&|<>`$\\"*?]') { return $false }
@@ -741,6 +752,35 @@ function Parse-Meminfo([string]$txt) {
   return $h
 }
 function Mb([int64]$kb) { return [math]::Round($kb / 1024) }
+# Размер для людей: 850 МБ / 3,4 ГБ (десятичный разделитель — по языку набора)
+function Fmt-Mb([double]$mb) {
+  if ($mb -ge 1024) {
+    $v = ([math]::Round($mb / 1024, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)
+    if ($script:Lang -ne 'en') { $v = $v.Replace('.', ',') }
+    return (L 's010' $v)
+  }
+  return (L 's011' ([math]::Round($mb)))
+}
+# Короткий снимок для «было / стало»: свободная ОЗУ, число процессов, свободное место, отключённые пакеты
+function Get-Snap {
+  $s = [ordered]@{ memAvailMb = 0; procs = 0; dataFreeMb = 0; disabled = 0 }
+  try {
+    $m = Parse-Meminfo (Sh 'cat /proc/meminfo')
+    if ($m['MemAvailable']) { $s.memAvailMb = Mb $m['MemAvailable'] }
+    $s.procs = @(Parse-Ps (Sh $(if ($script:PsCmd) { $script:PsCmd } else { 'ps -A' }))).Count
+    $s.dataFreeMb = Mb (Get-DataFree)
+    $s.disabled = (Parse-PkgList (Sh 'pm list packages -d')).Count
+  } catch {}
+  return $s
+}
+# Подпись пакета для людей: наше пояснение -> имя из базы UAD -> сам пакет
+function Get-PkgLabel([string]$p) {
+  $n = $null
+  if ($ruNote -and $ruNote[$p]) { $n = $ruNote[$p] }
+  elseif ($uad -and $uad[$p] -and $uad[$p].name) { $n = $uad[$p].name }
+  if ($n) { return $n }
+  return $p
+}
 
 function Parse-Duration([string]$s) {
   $s = $s.Trim()
@@ -991,7 +1031,7 @@ function Set-GlobalSetting([string]$key, [string]$val) {
   $old = (Sh "settings get global $key").Trim()
   if ($old -eq $val) { return }
   [void](ShW "settings put global $key $val")
-  Add-Journal @{ t = 'setting'; key = $key; old = $old }
+  Add-Journal @{ t = 'setting'; key = $key; old = $old; new = $val }
 }
 function Set-Anim([string]$val) {
   foreach ($k in $AnimKeys) { Set-GlobalSetting $k $val }
@@ -1037,6 +1077,7 @@ function Clear-Caches {
   Start-Sleep -Seconds 3
   $f2 = Get-DataFree
   $d = [math]::Max(0, (Mb ($f2 - $f1)))
+  $script:CacheFreedMb = $d
   OptLog (L 'm145' $d $(Mb $f2)) 'ok'
 }
 function Get-DataFree {
@@ -1059,6 +1100,13 @@ function Undo-Entry($e) {
       [void](ShW "cmd appops set $($e.pkg) RUN_ANY_IN_BACKGROUND $old")
       OptLog (L 'm148' $($e.pkg)) 'ok'
     }
+  }
+}
+function Undo-Selected([int[]]$idx) {
+  foreach ($i in @($idx | Sort-Object -Descending)) {
+    if ($i -lt 0 -or $i -ge $script:Journal.Count) { continue }
+    Undo-Entry $script:Journal[$i]
+    $script:Journal.RemoveAt($i); Save-State
   }
 }
 function Undo-Journal([int]$from = 0) {
@@ -1131,6 +1179,7 @@ function Invoke-RebootCheck {
     }
     Start-Sleep -Seconds 10
   }
+  $script:RebootOk = $up
   if (-not $up) {
     if ($seen) {
       OptLog (L 'm163') 'bad'
@@ -1168,8 +1217,9 @@ function Invoke-Optimization {
   $animNow = $set['anim_w']
   if ($animNow -notin @('0.5', '0.5f', '0', '0.0')) { AddItem 'anim' '' (L 'm174' $(if ($animNow -and $animNow -ne 'null') { $animNow } else { '1x' })) $true (L 'm175') }
   if ($set['dns_mode'] -ne 'hostname') {
-    if ($kids) { AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175') }
-    else { AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false (L 'm175') }
+    # Оба варианта; профиль «Ребёнок» на странице отмечает семейный. Отмечены оба — берётся семейный.
+    if ($kids) { AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175'); AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false (L 'm175') }
+    else { AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false (L 'm175'); AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175') }
   }
   $cacheTxt = (L 'm178')
   if ($cacheMb -gt 0) { $cacheTxt += (L 'm179' $cacheMb) }
@@ -1262,9 +1312,10 @@ function Invoke-Optimization {
 
   Emit 'stage' @{ s = 'run' }
   Title (L 'm210')
+  $script:SnapBefore = Get-Snap
   $stopped = $false
   if ($sel | Where-Object { $_.Kind -eq 'anim' }) { Set-Anim '0.5' }
-  $d = $sel | Where-Object { $_.Kind -eq 'dns' } | Select-Object -First 1
+  $d = $sel | Where-Object { $_.Kind -eq 'dns' } | Sort-Object { if ($_.Pkg -like 'family*') { 0 } else { 1 } } | Select-Object -First 1
   if ($d) { [void](Set-Dns $d.Pkg) }
   if ($sel | Where-Object { $_.Kind -eq 'cache' }) { Clear-Caches }
 
@@ -1287,6 +1338,9 @@ function Invoke-Optimization {
 
   Say ''
   if ($script:Journal.Count -eq 0) { OptLog (L 'm214') 'warn'; return }
+  Start-Sleep -Seconds 10
+  $script:SnapAfter = Get-Snap
+  Emit 'compare' ([ordered]@{ before = $script:SnapBefore; after = $script:SnapAfter; reboot = $false })
   Say (L 'm215') 'Cyan'
   Say (L 'm216') 'Cyan'
   if (Confirm-Yes (L 'm217') (L 'w013')) {
@@ -1295,7 +1349,14 @@ function Invoke-Optimization {
     OptLog ((L 'm219') + (Get-HomeComp)) 'ok'
     return
   }
-  if (Confirm-Yes (L 'm220') (L 'w014')) { Invoke-RebootCheck }
+  if (Confirm-Yes (L 'm220') (L 'w014')) {
+    Invoke-RebootCheck
+    if ($script:RebootOk) {
+      Start-Sleep -Seconds 20
+      $sa = Get-Snap
+      if ($sa.memAvailMb -gt 0) { $script:SnapAfter = $sa; $script:SnapAfterReboot = $true; Emit 'compare' ([ordered]@{ before = $script:SnapBefore; after = $sa; reboot = $true }) }
+    }
+  }
   OptLog ((L 'm221') -f $script:Journal.Count, $repName) 'ok'
 }
 
@@ -1342,16 +1403,31 @@ function Invoke-Restore {
   Say ''
   Say (L 'm231') 'White'
   $entries = @($j.journal)
-  for ($i = $entries.Count - 1; $i -ge 0; $i--) {
+  $pick = @()
+  for ($i = 0; $i -lt $entries.Count; $i++) {
     $e = $entries[$i]
-    switch ([string]$e.t) {
-      'disable' { Say (L 'm232' $($e.pkg)) }
-      'uninstall' { Say (L 'm233' $($e.pkg)) }
-      'setting' { Say (L 'm234' $($e.key) $(if ($e.old -and $e.old -ne 'null') { $e.old } else { (L 'm146') })) }
-      'appops' { Say (L 'm235' $($e.pkg)) }
+    $t = switch ([string]$e.t) {
+      'disable' { (L 'm232' $($e.pkg)) }
+      'uninstall' { (L 'm233' $($e.pkg)) }
+      'setting' { (L 'm234' $($e.key) $(if ($e.old -and $e.old -ne 'null') { $e.old } else { (L 'm146') })) }
+      'appops' { (L 'm235' $($e.pkg)) }
+      default { [string]$e.t }
     }
+    $t = ($t.Trim() -replace '^-\s*', '')
+    Say ("{0,3}. {1}" -f ($i + 1), $t)
+    $pick += [ordered]@{ n = $i + 1; text = $t; pkg = [string]$e.pkg; label = $(if ($e.pkg) { Get-PkgLabel ([string]$e.pkg) } else { '' }) }
   }
-  if (-not (Confirm-Yes (L 'm236') (L 'w015'))) { Say (L 'm237'); return }
+  # Выборочный откат: Enter — всё; номера — только они; страница присылает «=1,4,7»
+  $sel = Ask (L 'r001') 'pick' $null @{ items = $pick }
+  if ($sel -match '^[QqЙй]$' -or $sel -eq '=') { Say (L 'm237'); return }
+  $only = $null
+  $s2 = $sel.TrimStart('=')
+  if ($s2 -match '\d') {
+    $only = @($s2 -split '[,\s]+' | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ - 1 } | Where-Object { $_ -ge 0 -and $_ -lt $entries.Count } | Select-Object -Unique)
+    if ($only.Count -eq 0) { Say (L 'm237'); return }
+    Say (L 'r002' $only.Count $entries.Count) 'White'
+  }
+  if (-not $sel.StartsWith('=')) { if (-not (Confirm-Yes (L 'm236') (L 'w015'))) { Say (L 'm237'); return } }
   $stamp2 = Get-Date -Format 'yyyy-MM-dd_HH-mm'
   $rd = Join-Path $Root ("reports/" + $stamp2 + '_restore_' + ($mdl -replace '[^A-Za-z0-9_.-]', '_'))
   New-Item -ItemType Directory -Force -Path $rd | Out-Null
@@ -1363,7 +1439,8 @@ function Invoke-Restore {
   $script:State = $j
   $script:State.journal = $script:Journal
   $script:keepSet = New-Object 'System.Collections.Generic.HashSet[string]'
-  Undo-Journal 0
+  if ($null -ne $only) { Undo-Selected $only } else { Undo-Journal 0 }
+  if ($script:Journal.Count -gt 0) { OptLog (L 'r003' $script:Journal.Count) 'ok' }
   $h = Get-HomeComp
   if (Test-HomeBad $h) { OptLog (L 'm238' $h) 'warn' } else { OptLog (L 'm239' $h) 'ok' }
   OptLog (L 'm240')
@@ -1400,6 +1477,21 @@ if ($script:Lang -ne 'ru') {
 # Интерфейс: страница в браузере (по умолчанию), консоль — запасной вариант и для тестов
 $useWeb = $Web -or (-not $Console -and -not [Console]::IsInputRedirected)
 if ($useWeb) { if (-not (Start-Web)) { Warn (L 'w005') } }
+# Новая версия на GitHub? (4 секунды максимум; без интернета — молча дальше)
+if (-not $NoUpdateCheck) {
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $uu = $(if ($UpdateUrl) { $UpdateUrl } else { 'https://api.github.com/repos/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest' })
+    $rel = Invoke-RestMethod -Uri $uu -TimeoutSec 4 -UseBasicParsing -Headers @{ 'User-Agent' = 'phone-kit' }
+    $tag = ([string]$rel.tag_name) -replace '^[vV]', ''
+    $nv = $null; $cv = $null
+    if ([version]::TryParse(($tag + '.0').Split('-')[0], [ref]$nv) -and [version]::TryParse($KitVersion + '.0', [ref]$cv) -and $nv -gt $cv) {
+      $link = $(if ($rel.html_url) { [string]$rel.html_url } else { 'https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest' })
+      Warn (L 'u001' $tag $link)
+      Emit 'update' @{ version = $tag; url = $link }
+    }
+  } catch {}
+}
 Emit 'stage' @{ s = 'start' }
 $Mode = 'diag'
 while ($true) {
@@ -1479,7 +1571,7 @@ $procs = @(); $psTxt = ''
 foreach ($pc in @('ps -A -o RSS,NAME', 'ps -A', 'ps')) {
   $psTxt = Sh $pc
   $procs = Parse-Ps $psTxt
-  if ($procs.Count -ge 3) { break }
+  if ($procs.Count -ge 3) { $script:PsCmd = $pc; break }
 }
 Save-Raw 'ps.txt' $psTxt
 $topProcs = $procs | Sort-Object Kb -Descending | Select-Object -First 15
@@ -1506,6 +1598,33 @@ for ($c = 0; $c -lt [math]::Min($nCpu, 16); $c++) {
   if ($mx -match '^\d+$') { $cores += [pscustomobject]@{ Cpu = $c; MaxMhz = [math]::Round([int64]$mx / 1000); CurMhz = $(if ($cu -match '^\d+$') { [math]::Round([int64]$cu / 1000) } else { 0 }) } }
 }
 $batTxt = Sh 'dumpsys battery'; Save-Raw 'battery.txt' $batTxt
+# Расход батареи с последней зарядки по приложениям: «Estimated power use» из batterystats, uid -> пакет
+$batApps = @(); $batSince = ''
+try {
+  $bsTxt = Sh 'dumpsys batterystats' 120
+  $uidPk = @{}
+  foreach ($l in ((Sh 'pm list packages -U') -split "`n")) { if ($l -match '^package:([A-Za-z0-9_.]+)\s+uid:(\d+)') { $u = [int]$Matches[2]; if (-not $uidPk.ContainsKey($u)) { $uidPk[$u] = $Matches[1] } } }
+  if ($bsTxt -match '(?m)Time on battery:\s*([^(\r\n]+)') { $batSince = $Matches[1].Trim() }
+  $at = $bsTxt.IndexOf('Estimated power use')
+  if ($at -ge 0) {
+    $seen = $false; $sum = @{}
+    foreach ($l in ($bsTxt.Substring($at) -split "`n" | Select-Object -Skip 1)) {
+      if (-not $l.Trim()) { if ($seen) { break } else { continue } }
+      if ($l -match '^\s*(?:Uid|UID) (?:u(\d+)a(\d+)|(\d+)):\s*([\d.]+)') {
+        $seen = $true
+        $uid = if ($Matches[2]) { 10000 + [int]$Matches[2] } else { [int]$Matches[3] }
+        $mah = 0.0; [void][double]::TryParse($Matches[4], [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$mah)
+        if ($uid -ge 10000 -and $mah -gt 0) { $sum[$uid] = [double]$sum[$uid] + $mah }
+      }
+    }
+    $tot = 0.0; foreach ($v in $sum.Values) { $tot += $v }
+    $batApps = @($sum.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 8 | ForEach-Object {
+      $pkg = $(if ($uidPk.ContainsKey([int]$_.Key)) { $uidPk[[int]$_.Key] } else { 'uid ' + $_.Key })
+      [pscustomobject]@{ Pkg = $pkg; Mah = [math]::Round($_.Value, 1); Pct = $(if ($tot -gt 0) { [math]::Round(100 * $_.Value / $tot) } else { 0 }) }
+    })
+  }
+  Save-Raw 'battery_usage.txt' ((@("since: $batSince") + @($batApps | ForEach-Object { "{0}`t{1}`t{2}%" -f $_.Pkg, $_.Mah, $_.Pct })) -join "`n")
+} catch {}
 $batLevel = ''; $batTemp = 0.0; $batHealth = ''; $batPlug = ''
 if ($batTxt -match '(?m)^\s*level: (\d+)') { $batLevel = $Matches[1] }
 if ($batTxt -match '(?m)^\s*temperature: (\d+)') { $batTemp = [double]$Matches[1] / 10 }
@@ -1544,6 +1663,34 @@ if ($dsNames.Count -gt 0 -and $dsCache.Count -eq $dsNames.Count) {
   $bigApps = $bigApps | Sort-Object Mb -Descending | Select-Object -First 10
 }
 if ($dsTxt -match '(?m)^(Photos|Videos|Audio|Downloads|System|Other) Size') { Save-Raw 'diskstats_summary.txt' (($dsTxt -split "`n" | Where-Object { $_ -match '^(Data-Free|Cache-Free|System-Free|Latency|Photos|Videos|Audio|Downloads|System|Other) ' }) -join "`n") }
+# Что занимает память: категории Android (diskstats) + папки мессенджеров и камеры (du, только чтение)
+$storeCat = [ordered]@{}
+foreach ($k in @('Photos', 'Videos', 'Audio', 'Downloads', 'App', 'App Data', 'App Cache', 'System', 'Other')) {
+  if ($dsTxt -match ('(?m)^' + [regex]::Escape($k) + ' Size: (\d+)')) { $storeCat[$k] = [math]::Round([int64]$Matches[1] / 1MB) }
+}
+$msgDirs = [ordered]@{
+  'WhatsApp' = @('/sdcard/Android/media/com.whatsapp/WhatsApp/Media', '/sdcard/WhatsApp/Media')
+  'Telegram' = @('/sdcard/Android/media/org.telegram.messenger', '/sdcard/Telegram', '/sdcard/Android/data/org.telegram.messenger/files')
+  'Viber' = @('/sdcard/Android/media/com.viber.voip', '/sdcard/viber')
+  'DCIM' = @('/sdcard/DCIM'); 'Download' = @('/sdcard/Download'); 'Movies' = @('/sdcard/Movies')
+}
+$storeDirs = @()
+try {
+  $duTxt = Sh ('du -s -k ' + ((@($msgDirs.Values | ForEach-Object { $_ })) -join ' ')) 120
+  $duKb = @{}; foreach ($l in ($duTxt -split "`n")) { if ($l -match '^(\d+)\s+(/\S+)') { $duKb[$Matches[2]] = [int64]$Matches[1] } }
+  foreach ($k in $msgDirs.Keys) { $sk = [int64]0; foreach ($pth in $msgDirs[$k]) { if ($duKb.ContainsKey($pth)) { $sk += $duKb[$pth] } }; if ($sk -gt 0) { $storeDirs += [pscustomobject]@{ Name = $k; Mb = (Mb $sk) } } }
+  Save-Raw 'storage_dirs.txt' $duTxt
+} catch {}
+function Dir-Mb([string]$n) { foreach ($d in $storeDirs) { if ($d.Name -eq $n) { return [double]$d.Mb } }; return 0 }
+$storeTips = New-Object System.Collections.ArrayList
+if ((Dir-Mb 'WhatsApp') -ge 1024) { [void]$storeTips.Add((L 's001' (Fmt-Mb (Dir-Mb 'WhatsApp')))) }
+if ((Dir-Mb 'Telegram') -ge 1024) { [void]$storeTips.Add((L 's002' (Fmt-Mb (Dir-Mb 'Telegram')))) }
+if ((Dir-Mb 'Viber') -ge 1024) { [void]$storeTips.Add((L 's003' (Fmt-Mb (Dir-Mb 'Viber')))) }
+$pv = [double]$storeCat['Photos'] + [double]$storeCat['Videos']; if ($pv -lt (Dir-Mb 'DCIM')) { $pv = Dir-Mb 'DCIM' }
+if ($pv -ge 5120) { [void]$storeTips.Add((L 's004' (Fmt-Mb $pv))) }
+$dl = [math]::Max([double]$storeCat['Downloads'], (Dir-Mb 'Download')); if ($dl -ge 1024) { [void]$storeTips.Add((L 's005' (Fmt-Mb $dl))) }
+if ($cacheMb -ge 1024) { [void]$storeTips.Add((L 's006' (Fmt-Mb $cacheMb))) }
+if ($bigApps -and @($bigApps)[0].Mb -ge 3072) { [void]$storeTips.Add((L 's007' (@($bigApps)[0].Pkg) (Fmt-Mb (@($bigApps)[0].Mb)))) }
 
 Step (L 'm269')
 $all = Parse-PkgList (Sh 'pm list packages')
@@ -1837,6 +1984,10 @@ W ((L 'm365') -f ($users -join ', '))
 W ''
 W (L 'm366')
 W ((L 'm367') -f $batLevel, $batTemp, $healthName, $(if ($batPlug) { (L 'm368' $batPlug) } else { '' }))
+if ($batApps.Count) {
+  W (L 'b001' $(if ($batSince) { $batSince } else { '?' }))
+  foreach ($a in $batApps) { W ("    {0,4}%  {1,7} mAh  {2}" -f $a.Pct, $a.Mah, $a.Pkg) }
+}
 W ((L 'm369') -f $(if ($set['low_power'] -eq '1') { (L 'm370') } else { (L 'm371') }))
 W ((L 'm372') -f $thStatus, $(if ($temps.Count) { '; ' + (($temps.Keys | ForEach-Object { "$_ $($temps[$_]) °C" }) -join ', ') } else { '' }))
 if ($cores) { W ((L 'm373') + (($cores | ForEach-Object { "$($_.CurMhz)/$($_.MaxMhz)" }) -join '  ')) }
@@ -1849,6 +2000,13 @@ W ((L 'm378') -f (Mb $mem['SwapTotal']), (Mb $mem['SwapFree']))
 W ((L 'm379') -f [math]::Floor($uptimeSec / 86400), [math]::Floor(($uptimeSec % 86400) / 3600))
 W ((L 'm380') -f (Mb $dataTotal), (Mb $dataUsed), $dataPct, (Mb $dataFree), $cacheMb)
 if ($bigApps) { W (L 'm381'); foreach ($b in $bigApps) { W ((L 'm382') -f $b.Mb, $b.Pkg, $b.CacheMb) } }
+if ($storeCat.Count -or $storeDirs.Count) {
+  W (L 's020')
+  $catKey = @{ 'Photos' = 's021'; 'Videos' = 's022'; 'Audio' = 's023'; 'Downloads' = 's024'; 'App' = 's025'; 'App Data' = 's026'; 'App Cache' = 's027'; 'System' = 's028'; 'Other' = 's029' }
+  foreach ($k in $storeCat.Keys) { W ("    {0,-24} {1}" -f (L $catKey[$k]), (Fmt-Mb $storeCat[$k])) }
+  foreach ($d in $storeDirs) { W ("    {0,-24} {1}" -f ('/sdcard: ' + $d.Name), (Fmt-Mb $d.Mb)) }
+  foreach ($t in $storeTips) { W ('    -> ' + $t) }
+}
 W (L 'm383')
 foreach ($pr in $topProcs) { W ((L 'm384') -f (Mb $pr.Kb), $pr.Name) }
 W ''
@@ -1904,6 +2062,66 @@ W (L 'm426')
 
 $repTxt = Join-Path $RepDir 'report.txt'
 $zip = $RepDir + '.zip'
+# Отчёт для клиента: одна страница HTML на языке набора (печатается в PDF), кладётся в папку отчёта и в архив
+function Save-ClientReport {
+  try {
+    $H = { param($t) [System.Net.WebUtility]::HtmlEncode([string]$t) }
+    $sb = New-Object System.Text.StringBuilder
+    $done = New-Object System.Collections.ArrayList
+    if ($script:Journal) {
+      $anim = $false; $dnsV = ''
+      foreach ($e in $script:Journal) {
+        switch ([string]$e.t) {
+          'disable' { [void]$done.Add((L 'c020' (Get-PkgLabel ([string]$e.pkg)))) }
+          'uninstall' { [void]$done.Add((L 'c020' (Get-PkgLabel ([string]$e.pkg)))) }
+          'appops' { [void]$done.Add((L 'c021' (Get-PkgLabel ([string]$e.pkg)))) }
+          'setting' { if ([string]$e.key -like '*animation*' -or [string]$e.key -like 'animator*') { $anim = $true } elseif ([string]$e.key -eq 'private_dns_specifier') { $dnsV = [string]$e.new } }
+        }
+      }
+      if ($anim) { [void]$done.Insert(0, (L 'c022')) }
+      if ($dnsV) { [void]$done.Insert(0, (L 'c023' $dnsV)) }
+    }
+    if ($script:CacheFreedMb) { [void]$done.Insert(0, (L 'c024' (Fmt-Mb $script:CacheFreedMb))) }
+    $tips = New-Object System.Collections.ArrayList
+    foreach ($t in $storeTips) { [void]$tips.Add($t) }
+    if ($uptimeSec -gt 7 * 86400 -or $Mode -eq 'opt') { [void]$tips.Add((L 'c030')) }
+    if ($dataPct -ge 85) { [void]$tips.Add((L 'c031' $dataPct)) }
+    foreach ($a in @($batApps | Select-Object -First 1)) { if ($a.Pct -ge 25) { [void]$tips.Add((L 'c032' (Get-PkgLabel $a.Pkg) $a.Pct)) } }
+    [void]$sb.Append('<!doctype html><html lang="' + $script:Lang + '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + (& $H (L 'c010')) + '</title><style>')
+    [void]$sb.Append('body{margin:0;background:#F3F5F8;color:#111827;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}.w{max-width:820px;margin:0 auto;padding:28px 20px}.c{background:#fff;border:1px solid #E2E6EC;border-radius:16px;padding:22px;margin-top:16px}h1{font-size:26px;margin:0}h2{font-size:18px;margin:0 0 10px}.m{color:#4B5563}ul{margin:0;padding-left:20px}li{margin:6px 0}table{border-collapse:collapse;width:100%}td{padding:8px 0;border-bottom:1px solid #F0F2F5}td.n{text-align:right;white-space:nowrap}.up{color:#05603A;font-weight:700}.ok{background:#ECFDF3;border-color:#ABEFC6}.f{font-size:12px;color:#6B7280;margin-top:18px}.b{display:inline-block;margin-top:14px;padding:10px 16px;border-radius:10px;background:#1D4ED8;color:#fff;text-decoration:none;font-weight:600;border:0;cursor:pointer;font-size:15px}@media print{body{background:#fff}.c{border-color:#ccc}.np{display:none}}')
+    [void]$sb.Append('</style></head><body><div class="w">')
+    [void]$sb.Append('<h1>' + (& $H (L 'c010')) + '</h1><p class="m">' + (& $H ("{0} {1} · {2}" -f $brand, $model, (Get-Date -Format 'yyyy-MM-dd'))) + $(if ($Label) { ' · ' + (& $H (L 'c011' $Label)) } else { '' }) + '</p>')
+    if ($done.Count) {
+      [void]$sb.Append('<div class="c ok"><h2>' + (& $H (L 'c012')) + '</h2><ul>')
+      foreach ($d in $done) { [void]$sb.Append('<li>' + (& $H $d) + '</li>') }
+      [void]$sb.Append('</ul></div>')
+    } else { [void]$sb.Append('<div class="c"><h2>' + (& $H (L 'c013')) + '</h2><p class="m">' + (& $H (L 'c014')) + '</p></div>') }
+    if ($script:SnapBefore -and $script:SnapAfter) {
+      $b0 = $script:SnapBefore; $a0 = $script:SnapAfter
+      [void]$sb.Append('<div class="c"><h2>' + (& $H $(if ($script:SnapAfterReboot) { (L 'c015') } else { (L 'c016') })) + '</h2><table>')
+      foreach ($row in @(@((L 'c003'), (Fmt-Mb $b0.memAvailMb), (Fmt-Mb $a0.memAvailMb), ($a0.memAvailMb -gt $b0.memAvailMb)), @((L 'c004'), $b0.procs, $a0.procs, ($a0.procs -lt $b0.procs)), @((L 'c005'), (Fmt-Mb $b0.dataFreeMb), (Fmt-Mb $a0.dataFreeMb), ($a0.dataFreeMb -gt $b0.dataFreeMb)))) {
+        [void]$sb.Append('<tr><td>' + (& $H $row[0]) + '</td><td class="n">' + (& $H $row[1]) + ' → <span class="' + $(if ($row[3]) { 'up' } else { '' }) + '">' + (& $H $row[2]) + '</span></td></tr>')
+      }
+      [void]$sb.Append('</table></div>')
+    }
+    [void]$sb.Append('<div class="c"><h2>' + (& $H (L 'c017')) + '</h2><table>')
+    [void]$sb.Append('<tr><td>' + (& $H (L 'c005')) + '</td><td class="n">' + (& $H (L 'c018' $dataPct (Fmt-Mb (Mb $dataFree)))) + '</td></tr>')
+    [void]$sb.Append('<tr><td>' + (& $H (L 'c019')) + '</td><td class="n">' + (& $H ("{0}% · {1} °C" -f $batLevel, $(if ($script:Lang -eq 'en') { [string]$batTemp } else { ([string]$batTemp).Replace('.', ',') }))) + '</td></tr></table></div>')
+    if ($tips.Count) {
+      [void]$sb.Append('<div class="c"><h2>' + (& $H (L 'c025')) + '</h2><ul>')
+      foreach ($t in $tips) { [void]$sb.Append('<li>' + (& $H $t) + '</li>') }
+      [void]$sb.Append('</ul></div>')
+    }
+    [void]$sb.Append('<div class="c"><p>' + (& $H (L 'c026')) + '</p><button class="b np" onclick="window.print()">' + (& $H (L 'c027')) + '</button></div>')
+    [void]$sb.Append('<p class="f">phone-kit ' + $KitVersion + ' · github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit</p></div></body></html>')
+    $cf = Join-Path $RepDir 'client_report.html'
+    [IO.File]::WriteAllText($cf, $sb.ToString(), (New-Object Text.UTF8Encoding($false)))
+    $script:ClientReport = $cf
+    if ($script:WebUi) { $script:WebUi.clientFile = $cf; Emit 'client' @{ file = $cf } }
+    Ok (L 'c028' $cf)
+  } catch { Warn ((L 'c029') + $_.Exception.Message) }
+}
+
 function Save-Report([switch]$NoZip) {
   [IO.File]::WriteAllText($repTxt, ($script:ReportLines -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
   if ($NoZip) { return }
@@ -1921,7 +2139,7 @@ function Save-Report([switch]$NoZip) {
     } finally { $za.Dispose() }
   } catch { Warn ((L 'm427') + $_.Exception.Message) }
 }
-if ($Mode -eq 'opt') { Save-Report -NoZip } else { Save-Report }
+Save-Report -NoZip
 
 # Сводка для страницы
 $sumApps = @($topUsage | Select-Object -First 6 | ForEach-Object { [ordered]@{ pkg = $_.Pkg; min = [math]::Round($_.Sec / 60) } })
@@ -1932,6 +2150,8 @@ Emit 'summary' ([ordered]@{
   upDays = [math]::Floor($uptimeSec / 86400); obs = @($obs); apps = $sumApps
   cand = $candOk.Count; candAuto = @($candOk | Where-Object { $_.Tier -eq 'auto' }).Count
   susp = @($susp | Where-Object { $_.Level -eq 'warn' } | ForEach-Object { [ordered]@{ pkg = $_.Pkg; why = $_.Why } })
+  storage = [ordered]@{ cat = $storeCat; dirs = @($storeDirs | ForEach-Object { [ordered]@{ name = $_.Name; mb = $_.Mb } }); tips = @($storeTips); apps = @($bigApps | Select-Object -First 5 | ForEach-Object { [ordered]@{ pkg = $_.Pkg; mb = $_.Mb } }) }
+  battery = [ordered]@{ since = $batSince; apps = @($batApps | ForEach-Object { [ordered]@{ pkg = $_.Pkg; mah = $_.Mah; pct = $_.Pct } }) }
 })
 # Краткая сводка на экран
 Say ''
@@ -1952,8 +2172,18 @@ if ($Mode -eq 'opt') {
     foreach ($t in $script:OptLines) { W "  - $t" }
     if ($script:ChangeLog) { W (L 'm434') }
   }
-  Save-Report
+  if ($script:SnapBefore -and $script:SnapAfter) {
+    W ''
+    W $(if ($script:SnapAfterReboot) { (L 'c001') } else { (L 'c002') })
+    $b0 = $script:SnapBefore; $a0 = $script:SnapAfter
+    W ("  {0,-28} {1,10} -> {2}" -f (L 'c003'), (Fmt-Mb $b0.memAvailMb), (Fmt-Mb $a0.memAvailMb))
+    W ("  {0,-28} {1,10} -> {2}" -f (L 'c004'), $b0.procs, $a0.procs)
+    W ("  {0,-28} {1,10} -> {2}" -f (L 'c005'), (Fmt-Mb $b0.dataFreeMb), (Fmt-Mb $a0.dataFreeMb))
+    W ("  {0,-28} {1,10} -> {2}" -f (L 'c006'), $b0.disabled, $a0.disabled)
+  }
 }
+Save-ClientReport
+Save-Report
 
 Ok (L 'm435' $zip)
 Emit 'report' @{ zip = $zip; txt = $repTxt; mode = $Mode; journal = $(if ($script:Journal) { $script:Journal.Count } else { 0 }) }
