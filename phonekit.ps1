@@ -32,7 +32,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '0.6'
+$KitVersion = '0.7'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -880,7 +880,11 @@ function Invoke-RebootCheck {
       if (Confirm-Yes 'Попробовать откатить ВСЁ сделанное прямо сейчас? (да / Enter — нет)') { Undo-Journal 0 }
       Say '  Если не поможет: подождать 10 минут, принудительная перезагрузка (питание + громкость вниз 10-15 с), потом снова пункт 3 «Откат». Сброс к заводским НЕ делать.' 'Yellow'
     } else {
-      OptLog 'телефон не вернулся в ADB за 5 минут. Проверь экран телефона: если загрузился — включи отладку снова, запусти набор и сделай диагностику (пункт 1) или откат (пункт 3).' 'warn'
+      if ($wifi) {
+        OptLog 'телефон не вернулся по Wi-Fi за 5 минут. Обычно это нормально: после перезагрузки Xiaomi и многие другие сами выключают «Беспроводную отладку». Если телефон загрузился и работает — изменения сохранены. Проверить: включи «Беспроводную отладку», запусти набор, пункт 1 — отключённое будет в «Уже отключены».' 'warn'
+      } else {
+        OptLog 'телефон не вернулся в ADB за 5 минут. Проверь экран телефона: если загрузился — включи отладку снова, запусти набор и сделай диагностику (пункт 1) или откат (пункт 3).' 'warn'
+      }
     }
     return
   }
@@ -938,22 +942,38 @@ function Invoke-Optimization {
       if ($it.On) { Say ("  [x] {0,2}. {1}" -f ($i + 1), $it.Text) 'White' } else { Say ("  [ ] {0,2}. {1}" -f ($i + 1), $it.Text) 'DarkGray' }
     }
     Say ''
-    Say 'Номера через пробел — отметить/снять (можно 5-12); B — отметить все «база: можно»; A — всё; 0 — снять всё; Enter — дальше; Q — выйти без изменений' 'Cyan'
-    $a = ([string](Read-Host 'Ввод')).Trim()
+    Say '[x] — уже выбрано, будет сделано. Чтобы выполнить отмеченное — просто Enter.' 'Green'
+    Say 'Номер (через пробел, можно 5-12) ПЕРЕКЛЮЧАЕТ галочку: у отмеченного снимает, у пустого ставит.' 'Cyan'
+    Say 'B — отметить все «база: можно»; A — всё; 0 — снять всё; Q — выйти без изменений' 'Cyan'
+    $a = ([string](Read-Host 'Ввод (Enter — выполнить отмеченное)')).Trim()
     if ($a -eq '') { break }
     if ($a -match '^[QqЙй]$') { OptLog 'Выход из оптимизации без изменений.'; return }
     if ($a -match '^[AaФф]$') { foreach ($it in $items) { $it.On = $true }; continue }
     if ($a -match '^[BbИи]$') { foreach ($it in $items) { if ($it.Text -like '*(база: можно*') { $it.On = $true } }; continue }
     if ($a -eq '0') { foreach ($it in $items) { $it.On = $false }; continue }
+    $nums = New-Object System.Collections.ArrayList
     foreach ($n in ($a -split '[\s,;]+')) {
-      if ($n -match '^(\d+)-(\d+)$') { for ($k = [int]$Matches[1]; $k -le [int]$Matches[2]; $k++) { if ($k -ge 1 -and $k -le $items.Count) { $items[$k - 1].On = -not $items[$k - 1].On } } }
-      elseif ($n -match '^\d+$' -and [int]$n -ge 1 -and [int]$n -le $items.Count) { $items[[int]$n - 1].On = -not $items[[int]$n - 1].On }
+      if ($n -match '^(\d+)-(\d+)$') { for ($k = [int]$Matches[1]; $k -le [int]$Matches[2]; $k++) { [void]$nums.Add($k) } }
+      elseif ($n -match '^\d+$') { [void]$nums.Add([int]$n) }
     }
+    $off = @(); $onl = @()
+    foreach ($k in $nums) {
+      if ($k -lt 1 -or $k -gt $items.Count) { continue }
+      $items[$k - 1].On = -not $items[$k - 1].On
+      if ($items[$k - 1].On) { $onl += $k } else { $off += $k }
+    }
+    if ($off.Count -gt 0) { Say ("  Галочка СНЯТА (не будет сделано): " + ($off -join ' ')) 'Yellow' }
+    if ($onl.Count -gt 0) { Say ("  Галочка ПОСТАВЛЕНА (будет сделано): " + ($onl -join ' ')) 'Green' }
+    if ($off.Count -eq 0 -and $onl.Count -eq 0) { Warn 'Не понял ввод. Номера пунктов через пробел, или Enter — выполнить отмеченное.' }
   }
   $sel = @($items | Where-Object { $_.On })
   if ($sel.Count -eq 0) { OptLog 'Ничего не отмечено — ничего не менялось.'; return }
   Say ''
-  Say ("Будет выполнено пунктов: {0}. Всё, кроме очистки кэша, обратимо: пункт 3 в меню («Откат»)." -f $sel.Count) 'White'
+  Say 'Будет сделано:' 'White'
+  foreach ($it in $sel) { Say ("  - " + $it.Text) }
+  $autoOff = @($items | Where-Object { -not $_.On -and $_.Kind -eq 'disable' -and $_.Group -like 'Лишнее системное: реклама*' })
+  if ($autoOff.Count -gt 0) { Warn ("С {0} пунктов «реклама, сбор данных, мусор» галочка снята — они останутся включены: {1}" -f $autoOff.Count, (($autoOff | ForEach-Object { $_.Pkg }) -join ', ')) }
+  Say ("Пунктов: {0}. Всё, кроме очистки кэша, обратимо: пункт 3 в меню («Откат»)." -f $sel.Count) 'White'
   if (-not (Confirm-Yes 'Выполнить? Введи «да»')) { OptLog 'Отменено — ничего не менялось.'; return }
 
   # --- снимок «до» и журнал — до первого изменения
@@ -1630,6 +1650,7 @@ if ($Mode -eq 'opt') {
 Ok "Архив: $zip"
 Ok "Отчёт: $repTxt"
 Say ''
+if ($Mode -ne 'opt') { Say 'Это была только ДИАГНОСТИКА — на телефоне ничего не отключено. Чтобы отключить — запусти снова и выбери 2 «Оптимизация».' 'Yellow' }
 Say 'Дальше:' 'Cyan'
 Say '  - Перетащи архив .zip к себе через AnyDesk (на свой ПК в C:\cleanmytv\reports) — Claude его разберёт.' 'Cyan'
 if ($Mode -eq 'opt' -and $script:Journal -and $script:Journal.Count) {
