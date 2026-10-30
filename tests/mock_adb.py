@@ -135,7 +135,9 @@ def shell(cmd):
         if p in st['uninst']: st['uninst'].remove(p)
         save(); return 'Package %s installed for user: 0' % p
     if cmd.startswith('pm trim-caches'): return ''
-    if cmd in ('svc power reboot', 'reboot'): return ''
+    if cmd in ('svc power reboot', 'reboot'):
+        if os.environ.get('MOCK_WIFI'): st['paired'] = 0; save()   # как Xiaomi: после перезагрузки беспроводная отладка выключена
+        return ''
     return '/system/bin/sh: unknown mock: ' + cmd
 
 args = sys.argv[1:]

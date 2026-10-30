@@ -78,6 +78,12 @@ expect w_fault 'Нужно IP и порт через двоеточие'
 expect w_fault 'Сопряжение прошло'
 expect w_fault 'Архив:'
 
+# 6б. Wi-Fi + оптимизация + перезагрузка: отладка выключилась -> набор сам видит окно сопряжения и просит код
+MOCK_WIFI=1 run w_reboot xiaomi '2\nТ\nw\n123456\n\nда\n\nда\n123456\n'
+expect w_reboot 'вижу окно сопряжения на телефоне'
+expect w_reboot 'Сопряжение прошло, подключаюсь'
+expect w_reboot 'после перезагрузки всё отключённое осталось отключённым'
+
 # 7. Пункт U на подставных данных Windows
 if pwsh -NoProfile -File "$ROOT/tests/usbtest.ps1"; then echo "PASS usbtest"; else echo "FAIL usbtest"; FAIL=1; fi
 
