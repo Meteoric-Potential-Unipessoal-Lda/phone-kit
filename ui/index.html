@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>phone-kit</title>
+<style>
+:root{--bg:#F3F5F8;--card:#FFFFFF;--line:#E2E6EC;--ink:#111827;--muted:#4B5563;--soft:#6B7280;--blue:#1D4ED8;--blue2:#1E40AF;--blue-bg:#EEF2FF;--green:#12B76A;--green-ink:#05603A;--green-bg:#ECFDF3;--amber:#B54708;--amber-bg:#FFFAEB;--red:#B42318;--red-bg:#FEF3F2}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+h1,h2,h3{font-family:inherit;margin:0;letter-spacing:-.01em}
+h1{font-size:28px;font-weight:800;line-height:1.2}
+h2{font-size:19px;font-weight:700}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+header.top{background:var(--card);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding-top:14px;padding-bottom:14px}
+.brand{display:flex;align-items:center;gap:12px;flex:1 1 240px}
+.logo{width:40px;height:40px;border-radius:11px;background:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
+.brand b{display:block;font-size:18px;font-weight:800}
+.brand span{font-size:13px;color:var(--muted)}
+.chip{display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;background:var(--green-bg);border:1px solid #ABEFC6;font-size:14px;font-weight:600;color:var(--green-ink)}
+.chip.on{display:flex}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.langlbl{display:flex;align-items:center;gap:8px;font-size:14px;color:#374151}
+select.lang{min-height:40px;padding:0 10px;border:1px solid #CBD2DC;border-radius:10px;background:#fff}
+.layout{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;padding-top:24px;padding-bottom:40px}
+nav.side{flex:1 1 220px;max-width:100%;display:flex;flex-direction:column;gap:16px}
+main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
+#panel{display:flex;flex-direction:column;gap:20px}
+#panel:empty,#qbox:empty{display:none}
+.item .t1{display:block;font-weight:600}
+.item .t2{display:block;font-size:13px;color:var(--soft);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px}
+.steps{padding:10px}
+.step{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--soft);font-weight:500}
+.step .n{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;background:#EEF1F5;color:var(--muted)}
+.step.done{color:var(--ink)}
+.step.done .n{background:var(--green);color:#fff}
+.step.act{background:var(--blue-bg);color:var(--blue);font-weight:600}
+.step.act .n{background:var(--blue);color:#fff}
+.safe{display:flex;gap:10px;padding:0 6px;font-size:13px;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:10px;border:1px solid transparent;font-weight:600;cursor:pointer;text-decoration:none;background:none}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--blue2)}
+.btn-ghost{background:#fff;border-color:#CBD2DC;color:#1F2937}.btn-ghost:hover{background:#F1F4F8}
+.btn-danger{background:#fff;border-color:#F3C2BD;color:var(--red)}
+.btn-sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,.choice:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.linkbtn{background:none;border:0;color:var(--blue);font-weight:600;cursor:pointer;padding:6px 0;text-decoration:underline}
+.lead{font-size:16px;color:var(--muted);margin-top:8px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.grid4{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.choice{display:flex;flex-direction:column;gap:10px;text-align:left;padding:22px;border-radius:16px;border:1px solid var(--line);background:#fff;cursor:pointer}
+.choice:hover{border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF}
+.choice b{font-size:19px}
+.choice span{color:var(--muted)}
+.choice.main{border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF}
+.ico{width:44px;height:44px;border-radius:12px;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;flex:none}
+.pad{padding:22px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.input{min-height:46px;padding:0 14px;border:1px solid #CBD2DC;border-radius:10px;background:#fff;width:100%;max-width:420px;font-size:16px}
+.digits{display:flex;gap:8px;flex-wrap:wrap}
+.digit{width:46px;height:54px;text-align:center;font-size:22px;font-weight:700;border:1px solid #CBD2DC;border-radius:10px;background:#fff}
+.note{display:flex;gap:8px;align-items:center;font-size:14px;border-radius:10px;padding:10px 12px}
+.note.ok{color:var(--green-ink);background:var(--green-bg)}
+.note.warn{color:var(--amber);background:var(--amber-bg)}
+.note.bad{color:var(--red);background:var(--red-bg)}
+.metric{padding:20px;display:flex;flex-direction:column;gap:10px}
+.metric .lbl{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.metric .val{font-size:28px;font-weight:800}
+.bar{height:8px;border-radius:999px;background:#EEF1F5;overflow:hidden}
+.bar>div{height:100%;border-radius:999px}
+.sub{font-size:13px;color:var(--muted)}
+.obs{display:flex;gap:12px;align-items:flex-start;margin-top:12px}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}
+.approw{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 72px;gap:12px;align-items:center;font-size:14px;margin-top:10px}
+.approw span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group{padding:8px}
+.ghead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 6px}
+.cnt{font-size:13px;font-weight:600;color:var(--blue);background:var(--blue-bg);padding:3px 9px;border-radius:999px}
+.item{display:flex;align-items:flex-start;gap:14px;padding:12px 16px;border-radius:12px;cursor:pointer}
+.item:hover{background:#F6F8FB}
+.item.on{background:#F8FAFF}
+.item input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--blue);flex:none;cursor:pointer}
+.item .txt{flex:1;min-width:0;overflow-wrap:anywhere}
+.tag{flex:none;align-self:center;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.tag.off{background:#fff;color:var(--blue);border:1px solid #B2CCFF}
+.sticky{position:sticky;bottom:16px;z-index:5}
+.dock{background:#0F172A;color:#fff;border-radius:16px;padding:14px 16px 14px 22px;display:flex;flex-wrap:wrap;align-items:center;gap:16px;box-shadow:0 12px 32px rgba(15,23,42,.25)}
+.dock .big{font-size:22px;font-weight:800}
+.dock .s{font-size:14px;color:#CBD5E1}
+.dock .s2{font-size:13px;color:#94A3B8}
+.logline{display:flex;gap:10px;padding:7px 14px;border-bottom:1px solid #F0F2F5;font-size:14px;overflow-wrap:anywhere}
+.logline:last-child{border-bottom:0}
+.logline .k{flex:none;width:18px;text-align:center;font-weight:700}
+.l-ok{color:var(--green-ink)}.l-warn{color:var(--amber)}.l-bad{color:var(--red)}.l-title{font-weight:700;color:var(--ink)}.l-say{color:#374151}.l-dim{color:var(--soft)}
+.logbox{max-height:420px;overflow:auto;padding:4px 0}
+.spinner{width:22px;height:22px;border-radius:50%;border:3px solid #DCE3EE;border-top-color:var(--blue);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.big-ok{width:64px;height:64px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;flex:none}
+.banner{display:none;background:var(--red-bg);color:var(--red);border:1px solid #F3C2BD;border-radius:12px;padding:12px 16px;font-weight:600}
+.banner.on{display:block}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}
+.hidden{display:none!important}
+@media (max-width:640px){.wrap{padding:0 16px}h1{font-size:24px}.layout{padding-top:16px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/><path d="M9.5 9.5l2 2 3.5-4"/></svg></div>
+      <div><b>phone-kit</b><span data-t="ui_sub">Android</span></div>
+    </div>
+    <div class="chip" id="chip"><i></i><span id="chipText"></span></div>
+    <label class="langlbl">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg>
+      <span data-t="ui_lang">Language</span>
+      <select class="lang" id="lang">
+        <option value="ru">Русский</option><option value="uk">Українська</option><option value="en">English</option>
+        <option value="pt">Português</option><option value="es">Español</option><option value="fr">Français</option>
+        <option value="it">Italiano</option><option value="de">Deutsch</option><option value="lv">Latviešu</option><option value="pl">Polski</option>
+      </select>
+    </label>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <nav class="side" aria-label="steps">
+    <div class="card steps" id="steps"></div>
+    <div class="safe">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9c-4-1.3-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span data-t="ui_safe"></span>
+    </div>
+    <div class="safe" style="font-size:12px;color:#6B7280"><span id="kitver"></span></div>
+  </nav>
+  <main>
+    <div class="banner" id="offline" data-t="ui_offline" style="order:-2"></div>
+    <div id="qbox"></div>
+    <div id="panel"></div>
+    <section class="card" id="logcard">
+      <div class="ghead" style="padding:14px 18px">
+        <h2 style="font-size:16px"><span data-t="ui_log">Log</span> <span class="cnt" id="logcnt">0</span></h2>
+        <button type="button" class="btn btn-ghost btn-sm" id="logtoggle"></button>
+      </div>
+      <div class="logbox hidden" id="logbox" aria-live="polite"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var TOKEN = (location.search.match(/[?&]t=([a-z0-9]+)/) || [])[1] || '';
+  var S = { seq: 0, stage: 'start', mode: null, device: null, summary: null, progress: null, report: null, finished: false,
+            q: null, qid: null, lang: 'ru', dict: {}, log: [], stageLogFrom: { connect: 0, run: 0, restore: 0, diag: 0 }, sel: {}, logOpen: false, sent: false, closed: false };
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function T(k) { var a = arguments, s = S.dict[k] || FALLBACK[k] || k; return s.replace(/\{(\d+)\}/g, function (m, i) { return a[+i + 1] != null ? a[+i + 1] : m; }); }
+  function api(path, body) {
+    var url = path + (path.indexOf('?') < 0 ? '?' : '&') + 't=' + TOKEN;
+    var opt = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+    return fetch(url, opt).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+  }
+  var FALLBACK = { ui_offline: 'No connection to phone-kit. Is its window closed?', ui_log: 'Log', ui_lang: 'Language' };
+  var ICON = {
+    wifi: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5.5 12.5a10 10 0 0 1 13 0"/><path d="M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1"/></svg>',
+    usb: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v13"/><path d="M8 6l4-4 4 4"/><rect x="8" y="15" width="8" height="7" rx="1.5"/></svg>',
+    diag: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+    opt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
+    undo: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+    phone: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
+    check: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>',
+    tick: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>'
+  };
+
+  // ---------------------------------------------------------------- language
+  function loadLang(code) {
+    return api('/api/lang?code=' + code).then(function (d) {
+      S.dict = d || {}; S.lang = code; $('lang').value = code;
+      document.documentElement.lang = code;
+      var nodes = document.querySelectorAll('[data-t]');
+      for (var i = 0; i < nodes.length; i++) nodes[i].textContent = T(nodes[i].getAttribute('data-t'));
+      renderSteps(); renderPanel(); renderQuestion(true); renderLogToggle();
+    });
+  }
+  $('lang').addEventListener('change', function () { var c = this.value; api('/api/lang', { code: c }).then(function () { return loadLang(c); }).catch(function () {}); });
+
+  // ---------------------------------------------------------------- steps
+  function stepList() {
+    if (S.mode === 'restore') return ['start', 'connect', 'restore', 'done'];
+    if (S.mode === 'diag') return ['start', 'connect', 'diag', 'done'];
+    return ['start', 'connect', 'diag', 'plan', 'run', 'done'];
+  }
+  function renderSteps() {
+    var list = stepList(), cur = list.indexOf(S.stage), h = '';
+    for (var i = 0; i < list.length; i++) {
+      var cls = i < cur ? 'done' : (i === cur ? 'act' : '');
+      if (S.stage === 'done' && i === cur) cls = 'done';
+      h += '<div class="step ' + cls + '"' + (i === cur ? ' aria-current="step"' : '') + '><span class="n">' + (cls === 'done' ? '✓' : (i + 1)) + '</span><span>' + esc(T('ui_st_' + list[i])) + '</span></div>';
+    }
+    $('steps').innerHTML = h;
+  }
+
+  // ---------------------------------------------------------------- log
+  var KMARK = { ok: '✓', warn: '!', bad: '×', title: '›', say: '' };
+  function logClass(e) { if (e.k === 'say') return e.c === 'DarkGray' ? 'l-dim' : (e.c === 'Yellow' ? 'l-warn' : (e.c === 'Red' ? 'l-bad' : (e.c === 'Green' ? 'l-ok' : 'l-say'))); return 'l-' + e.k; }
+  function logHtml(e) { return '<div class="logline ' + logClass(e) + '"><span class="k">' + (KMARK[e.k] || '') + '</span><span>' + esc(String(e.t).replace(/^\s+/, '')) + '</span></div>'; }
+  function addLog(e) {
+    if (!e.t || !String(e.t).trim()) return;
+    S.log.push(e);
+    var box = $('logbox'), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.insertAdjacentHTML('beforeend', logHtml(e));
+    if (atEnd) box.scrollTop = box.scrollHeight;
+    $('logcnt').textContent = S.log.length;
+  }
+  function renderLogToggle() { $('logtoggle').textContent = T(S.logOpen ? 'ui_log_hide' : 'ui_log_show'); $('logbox').classList.toggle('hidden', !S.logOpen); }
+  $('logtoggle').addEventListener('click', function () { S.logOpen = !S.logOpen; renderLogToggle(); if (S.logOpen) $('logbox').scrollTop = $('logbox').scrollHeight; });
+  function logSince(from, max) { var a = S.log.slice(from); return a.slice(Math.max(0, a.length - max)); }
+
+  // ---------------------------------------------------------------- answers
+  function answer(v) {
+    if (!S.q || S.sent) return;
+    S.sent = true;
+    var id = S.q.id;
+    api('/api/answer', { id: id, value: String(v) }).catch(function () { S.sent = false; });
+    $('qbox').innerHTML = '<div class="card pad row"><div class="spinner"></div><span>' + esc(T('ui_wait')) + '</span></div>';
+  }
+  function cleanPrompt(p) { return String(p || '').replace(/\s*\([^()]*Enter[^()]*\)\s*$/, '').replace(/,?\s*Enter\s*[—–-].*$/, '').replace(/^\s+/, ''); }
+
+  // ---------------------------------------------------------------- question
+  function renderQuestion(force) {
+    var q = S.q, box = $('qbox');
+    if (!q) { box.innerHTML = ''; S.sent = false; return; }
+    if (!force && S.qid === q.id) return;
+    S.qid = q.id; S.sent = false;
+    var ex = q.extra || {}, opts = q.options || [], h = '';
+    if (q.kind === 'menu' && ex.screen === 'start') h = qStart(opts);
+    else if (q.kind === 'menu' && ex.screen === 'connect') h = qConnect(opts);
+    else if (q.kind === 'menu') h = qMenu(q, opts);
+    else if (q.kind === 'confirm') h = '<div class="card pad" style="display:flex;flex-direction:column;gap:16px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><h2>' + esc(cleanPrompt(q.prompt)) + '</h2><div class="row"><button type="button" class="btn btn-primary" data-v="yes">' + esc(T('ui_yes')) + '</button><button type="button" class="btn btn-ghost" data-v="">' + esc(T('ui_no')) + '</button></div></div>';
+    else if (q.kind === 'code6') h = qCode(q, ex);
+    else if (q.kind === 'plan') h = qPlan(ex.items || []);
+    else if (q.kind === 'text' || q.kind === 'addr') h = qText(q, ex);
+    else h = '<div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2>' + esc(cleanPrompt(q.prompt)) + '</h2><div class="row"><button type="button" class="btn btn-primary" data-v="">' + esc(T('ui_next')) + '</button></div></div>';
+    box.innerHTML = h;
+    wireQuestion(q);
+  }
+  function qStart(opts) {
+    var info = { '1': ['diag', 'ui_m1_t', 'ui_m1_d'], '2': ['opt', 'ui_m2_t', 'ui_m2_d'], '3': ['undo', 'ui_m3_t', 'ui_m3_d'] }, h = '';
+    for (var i = 0; i < opts.length; i++) {
+      var o = opts[i], f = info[o.key]; if (!f) continue;
+      h += '<button type="button" class="choice' + (o.key === '2' ? ' main' : '') + '" data-v="' + esc(o.key) + '"><span class="ico">' + ICON[f[0]] + '</span><b>' + esc(T(f[1])) + '</b><span>' + esc(T(f[2])) + '</span></button>';
+    }
+    return '<div style="display:flex;flex-direction:column;gap:20px"><div><h1>' + esc(T('ui_start_t')) + '</h1><p class="lead">' + esc(T('ui_start_d')) + '</p></div><div class="grid">' + h + '</div><div><button type="button" class="linkbtn" data-v="Q">' + esc(T('ui_exit')) + '</button></div></div>';
+  }
+  function qConnect(opts) {
+    var devs = '', has = {};
+    for (var i = 0; i < opts.length; i++) { has[opts[i].key] = opts[i]; if (/^\d+$/.test(opts[i].key)) devs += '<button type="button" class="btn btn-ghost" style="justify-content:flex-start;width:100%" data-v="' + esc(opts[i].key) + '">' + ICON.phone + '<span>' + esc(opts[i].label) + '</span></button>'; }
+    var h = '<div style="display:flex;flex-direction:column;gap:20px"><div><h1>' + esc(T('ui_connect_t')) + '</h1><p class="lead">' + esc(T('ui_connect_d')) + '</p></div>';
+    if (devs) h += '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2>' + esc(T('ui_found_dev')) + '</h2>' + devs + '</div>';
+    h += '<div class="grid">';
+    h += '<div class="card pad" style="display:flex;flex-direction:column;gap:14px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><span class="ico">' + ICON.wifi + '</span><h2>' + esc(T('ui_wifi_t')) + '</h2><p style="color:var(--muted);flex:1">' + esc(T('ui_wifi_d')) + '</p><button type="button" class="btn btn-primary" data-v="W">' + esc(T('ui_wifi_btn')) + '</button></div>';
+    h += '<div class="card pad" style="display:flex;flex-direction:column;gap:14px"><span class="ico">' + ICON.usb + '</span><h2>' + esc(T('ui_usb_t')) + '</h2><p style="color:var(--muted);flex:1">' + esc(T('ui_usb_d')) + '</p><div class="row"><button type="button" class="btn btn-ghost" data-v="R">' + esc(T('ui_refresh')) + '</button><button type="button" class="btn btn-ghost" data-v="U">' + esc(T('ui_usbcheck')) + '</button></div></div>';
+    h += '</div><div class="row" style="gap:18px"><button type="button" class="linkbtn" data-v="H">' + esc(T('ui_howto')) + '</button><button type="button" class="linkbtn" data-v="I">' + esc(T('ui_manual')) + '</button><button type="button" class="linkbtn" data-v="Q">' + esc(T('ui_exit')) + '</button></div></div>';
+    return h;
+  }
+  function qMenu(q, opts) {
+    var b = '';
+    for (var i = 0; i < opts.length; i++) b += '<button type="button" class="btn ' + (i === 0 ? 'btn-primary' : 'btn-ghost') + '" data-v="' + esc(opts[i].key) + '">' + esc(opts[i].label) + '</button>';
+    return '<div class="card pad" style="display:flex;flex-direction:column;gap:16px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><h2>' + esc(cleanPrompt(q.prompt)) + '</h2><div class="row">' + b + '</div></div>';
+  }
+  function qText(q, ex) {
+    var isLabel = q.kind === 'text' && ex.optional;
+    var title = isLabel ? T('ui_label_t') : cleanPrompt(q.prompt);
+    var d = isLabel ? '<p style="color:var(--muted)">' + esc(T('ui_label_d')) + '</p>' : '';
+    var ph = q.kind === 'addr' ? T('ui_addr_ph') : '';
+    return '<div class="card pad" style="display:flex;flex-direction:column;gap:14px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><h2>' + esc(title) + '</h2>' + d +
+      '<form id="qform" class="row" style="gap:10px"><input class="input" id="qin" autocomplete="off" ' + (q.kind === 'addr' ? 'inputmode="decimal" ' : '') + 'placeholder="' + esc(ph) + '" aria-label="' + esc(title) + '">' +
+      '<button type="submit" class="btn btn-primary">' + esc(T(isLabel ? 'ui_next' : 'ui_ok')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-v="">' + esc(T(isLabel ? 'ui_skip' : 'ui_cancel')) + '</button></form></div>';
+  }
+  function qCode(q, ex) {
+    var d = ''; for (var i = 0; i < 6; i++) d += '<input class="digit" maxlength="1" inputmode="numeric" autocomplete="one-time-code" aria-label="' + (i + 1) + '">';
+    return '<div class="card pad" style="display:flex;flex-direction:column;gap:14px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><span class="ico">' + ICON.wifi + '</span><h2>' + esc(T('ui_code_t')) + '</h2><p style="color:var(--muted)">' + esc(T('ui_code_d')) + '</p>' +
+      (ex.addr ? '<div class="note ok">' + ICON.tick + '<span>' + esc(T('ui_code_addr')) + ': <span class="mono">' + esc(ex.addr) + '</span></span></div>' : '') +
+      '<div class="digits" id="digits">' + d + '</div><div class="row"><button type="button" class="btn btn-primary" id="codego" disabled>' + esc(T('ui_connect_btn')) + '</button>' +
+      (ex.skip ? '<button type="button" class="btn btn-ghost" data-v="">' + esc(T('ui_skip')) + '</button>' : '') + '</div></div>';
+  }
+  var TAGS = { auto: ['ui_tag_auto', '#FEF3F2', '#B42318'], base: ['ui_tag_base', '#F2F4F7', '#344054'], ask: ['ui_tag_ask', '#EFF8FF', '#175CD3'] };
+  function tagFor(it) {
+    if (it.kind === 'disable' && TAGS[it.tier]) return TAGS[it.tier];
+    if (it.kind === 'third') return ['ui_tag_sec', '#FFFAEB', '#B54708'];
+    if (it.kind === 'bg') return ['ui_tag_bg', '#F2F4F7', '#344054'];
+    return ['ui_tag_set', '#F2F4F7', '#344054'];
+  }
+  function qPlan(items) {
+    S.planItems = items; S.sel = {};
+    for (var i = 0; i < items.length; i++) S.sel[items[i].n] = !!items[i].on;
+    return '<div id="plan" style="display:flex;flex-direction:column;gap:20px"></div>';
+  }
+  function renderPlan() {
+    var el = $('plan'); if (!el) return;
+    var items = S.planItems || [], groups = [], gi = {}, i;
+    for (i = 0; i < items.length; i++) { var g = items[i].group || T('ui_g_other'); if (!(g in gi)) { gi[g] = groups.length; groups.push({ title: g, items: [] }); } groups[gi[g]].items.push(items[i]); }
+    var h = '<div><h1>' + esc(T('ui_plan_t')) + '</h1><p class="lead">' + esc(T('ui_plan_d')) + '</p></div>';
+    for (var k = 0; k < groups.length; k++) {
+      var G = groups[k], on = 0, rows = '';
+      for (i = 0; i < G.items.length; i++) {
+        var it = G.items[i], sel = !!S.sel[it.n], tg = tagFor(it); if (sel) on++;
+        var tag = sel ? '<span class="tag" style="background:' + tg[1] + ';color:' + tg[2] + '">' + esc(T(tg[0])) + '</span>' : '<span class="tag off">' + esc(T('ui_avail')) + '</span>';
+        var txt = esc(it.text), at = (it.pkg && it.kind === 'disable') ? String(it.text).indexOf(it.pkg) : -1;
+        if (at >= 0) { var rest = String(it.text).slice(at + it.pkg.length).replace(/^\s*[—–-]\s*/, ''); txt = '<span class="t1">' + esc(rest || it.pkg) + '</span><span class="t2 mono">' + esc(it.pkg) + '</span>'; }
+        rows += '<label class="item' + (sel ? ' on' : '') + '"><input type="checkbox" data-n="' + it.n + '"' + (sel ? ' checked' : '') + '><span class="txt">' + txt + '</span>' + tag + '</label>';
+      }
+      h += '<section class="card group"><div class="ghead"><div class="row"><h2 style="font-size:17px">' + esc(G.title) + '</h2><span class="cnt">' + on + ' / ' + G.items.length + '</span></div><div class="row" style="gap:6px"><button type="button" class="btn btn-ghost btn-sm" data-gall="' + k + '">' + esc(T('ui_all')) + '</button><button type="button" class="btn btn-ghost btn-sm" data-gnone="' + k + '">' + esc(T('ui_none')) + '</button></div></div>' + rows + '</section>';
+    }
+    var cnt = 0; for (i = 0; i < items.length; i++) if (S.sel[items[i].n]) cnt++;
+    h += '<div class="sticky"><div class="dock"><div style="flex:1 1 260px;display:flex;flex-wrap:wrap;gap:6px 20px;align-items:baseline"><span class="big">' + cnt + '</span><span class="s">' + esc(T('ui_selected')) + '</span><span class="s2">' + esc(T('ui_rev')) + '</span></div>' +
+      '<button type="button" class="btn" style="color:#CBD5E1" id="planquit">' + esc(T('ui_quit_noch')) + '</button><button type="button" class="btn" style="background:#fff;color:#0F172A" id="plango"' + (cnt ? '' : ' disabled') + '>' + esc(T('ui_run')) + ' →</button></div></div>';
+    var y = window.scrollY; el.innerHTML = h; window.scrollTo(0, y);
+    el.onclick = function (e) {
+      var t = e.target.closest('button'); if (!t) return;
+      var all = t.getAttribute('data-gall'), none = t.getAttribute('data-gnone');
+      if (all !== null || none !== null) { var G2 = groups[+(all !== null ? all : none)]; for (var j = 0; j < G2.items.length; j++) S.sel[G2.items[j].n] = all !== null; renderPlan(); }
+      if (t.id === 'plango') { var ns = []; for (var m = 0; m < items.length; m++) if (S.sel[items[m].n]) ns.push(items[m].n); answer('=' + ns.join(',')); }
+      if (t.id === 'planquit') answer('Q');
+    };
+    el.onchange = function (e) { var n = e.target.getAttribute('data-n'); if (n) { S.sel[n] = e.target.checked; renderPlan(); } };
+  }
+  function wireQuestion(q) {
+    var box = $('qbox');
+    box.onclick = function (e) { var t = e.target.closest('[data-v]'); if (t && box.contains(t)) answer(t.getAttribute('data-v')); };
+    var f = $('qform');
+    if (f) { var inp = $('qin'); setTimeout(function () { inp.focus(); }, 30); f.onsubmit = function (e) { e.preventDefault(); answer(inp.value); }; }
+    var dg = $('digits');
+    if (dg) {
+      var ins = dg.querySelectorAll('input'), go = $('codego');
+      var val = function () { var s = ''; for (var i = 0; i < ins.length; i++) s += ins[i].value; return s; };
+      var upd = function () { go.disabled = !/^\d{6}$/.test(val()); };
+      for (var i = 0; i < ins.length; i++) (function (i) {
+        ins[i].addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(-1); if (this.value && i < 5) ins[i + 1].focus(); upd(); if (/^\d{6}$/.test(val())) answer(val()); });
+        ins[i].addEventListener('keydown', function (e) { if (e.key === 'Backspace' && !this.value && i > 0) ins[i - 1].focus(); if (e.key === 'Enter' && !go.disabled) answer(val()); });
+        ins[i].addEventListener('paste', function (e) { var t = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6); if (t.length) { e.preventDefault(); for (var j = 0; j < 6; j++) ins[j].value = t[j] || ''; upd(); if (t.length === 6) answer(t); } });
+      })(i);
+      go.onclick = function () { answer(val()); };
+      setTimeout(function () { ins[0].focus(); }, 30);
+    }
+    if (q.kind === 'plan') renderPlan();
+  }
+
+  // ---------------------------------------------------------------- panel
+  function gb(mb) { return (Math.round(mb / 102.4) / 10).toLocaleString(S.lang); }
+  function dur(min) { return min >= 60 ? Math.floor(min / 60) + ' ' + T('ui_h') + ' ' + (min % 60) + ' ' + T('ui_min') : min + ' ' + T('ui_min'); }
+  function bar(pct, color) { return '<div class="bar"><div style="width:' + Math.max(0, Math.min(100, pct)) + '%;background:' + color + '"></div></div>'; }
+  function renderPanel() {
+    var p = $('panel'), h = '';
+    var hideOnQuestion = S.q && S.q.extra && S.q.extra.screen === 'start';
+    p.style.order = (S.stage === 'plan' && S.summary) ? '-1' : '';
+    if (S.closed) { p.innerHTML = '<div class="card pad row">' + ICON.check + '<h2>' + esc(T('ui_closed')) + '</h2></div>'; return; }
+    if (S.stage === 'connect') {
+      var hint = logSince(S.stageLogFrom.connect, 200).filter(function (e) { return e.k !== 'title' && !/^\s*[A-Z0-9]\)\s/.test(e.t); }).slice(-14);
+      if (hint.length) { h += '<section class="card"><div class="ghead" style="padding:14px 18px"><h2 style="font-size:16px">' + esc(T('ui_hints')) + '</h2></div><div class="logbox" style="max-height:340px">'; for (var i = 0; i < hint.length; i++) h += logHtml(hint[i]); h += '</div></section>'; }
+    } else if (S.stage === 'diag' || (S.summary && (S.stage === 'plan' || (S.stage === 'done' && S.mode === 'diag')))) {
+      if (!S.summary) {
+        var last = S.log.length ? S.log[S.log.length - 1].t : '';
+        h += '<div class="card pad" style="display:flex;gap:16px;align-items:center"><div class="spinner"></div><div><h2>' + esc(T('ui_diag_t')) + '</h2><p style="color:var(--muted)">' + esc(T('ui_diag_wait')) + '</p><p class="sub mono" style="margin-top:6px">' + esc(String(last).trim()) + '</p></div></div>';
+      } else {
+        h += diagHtml(S.summary);
+      }
+    } else if (S.stage === 'run' || S.stage === 'restore') {
+      var lines = logSince(S.stageLogFrom[S.stage], 60).filter(function (e) { return e.k !== 'title'; }).reverse();
+      var pr = S.progress, pct = pr && pr.total ? Math.round(pr.done / pr.total * 100) : 0;
+      h += '<div><h1>' + esc(T(S.stage === 'run' ? 'ui_run_t' : 'ui_st_restore')) + '</h1>' + (S.stage === 'run' ? '<p class="lead">' + esc(T('ui_run_d')) + '</p>' : '') + '</div>';
+      if (S.stage === 'run') h += '<div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div class="row" style="justify-content:space-between;font-weight:600"><span>' + esc(pr ? T('ui_progress', pr.done, pr.total) : T('ui_wait')) + '</span><span>' + pct + '%</span></div>' + bar(pct, 'var(--blue)') + '</div>';
+      h += '<section class="card"><div class="logbox" style="max-height:none">'; for (var j = 0; j < lines.length; j++) h += logHtml(lines[j]); h += '</div></section>';
+    }
+    if (S.stage === 'done' && S.report) {
+      var msg = S.mode === 'opt' ? 'ui_done_opt' : (S.mode === 'restore' ? 'ui_done_restore' : 'ui_done_diag');
+      var dh = '<div class="card pad" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div class="big-ok">' + ICON.check + '</div><div style="flex:1 1 280px"><h1>' + esc(T('ui_done_t')) + '</h1><p class="lead">' + esc(T(msg)) + '</p>' +
+        (S.mode === 'opt' && S.report.journal ? '<p class="sub" style="margin-top:6px">' + esc(T('ui_journal_n', S.report.journal)) + '</p>' : '') + '</div></div>' +
+        '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_report')) + '</h2><p class="mono" style="overflow-wrap:anywhere">' + esc(S.report.zip) + '</p><p class="sub">' + esc(T('ui_report_d')) + '</p>' +
+        (S.finished ? '<div class="row"><button type="button" class="btn btn-primary" id="closebtn">' + esc(T('ui_close')) + '</button></div>' : '') + '</div>';
+      h = dh + h;
+    } else if (S.finished && !S.q) {
+      h = '<div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2>' + esc(T('ui_finished')) + '</h2><div class="row"><button type="button" class="btn btn-primary" id="closebtn">' + esc(T('ui_close')) + '</button></div></div>' + h;
+    }
+    if (hideOnQuestion) h = '';
+    p.innerHTML = h;
+    var cb = $('closebtn'); if (cb) cb.onclick = function () { api('/api/close', {}).catch(function () {}); S.closed = true; renderPanel(); };
+  }
+  function diagHtml(s) {
+    var red = '#D92D20', amber = '#F79009', green = '#12B76A';
+    var memPct = s.memTotalMb ? Math.round((1 - s.memAvailMb / s.memTotalMb) * 100) : 0;
+    var h = '<div style="display:flex;flex-direction:column;gap:20px"><div><h1>' + esc(T('ui_diag_t')) + '</h1><p class="lead">' + esc([s.brand + ' ' + s.model, 'Android ' + s.android, s.skin].filter(Boolean).join(' · ')) + ' · ' + esc(T('ui_ro')) + '</p></div><div class="grid4">';
+    h += '<div class="card metric"><div class="lbl">' + esc(T('ui_storage')) + '</div><div class="val" style="color:' + (s.dataPct >= 90 ? 'var(--red)' : 'var(--ink)') + '">' + s.dataPct + '%</div>' + bar(s.dataPct, s.dataPct >= 90 ? red : (s.dataPct >= 80 ? amber : green)) + '<div class="sub">' + esc(T('ui_free_of', gb(s.dataFreeMb), gb(s.dataTotalMb))) + '</div></div>';
+    h += '<div class="card metric"><div class="lbl">' + esc(T('ui_ram')) + '</div><div class="val">' + gb(s.memAvailMb) + ' ' + esc(T('ui_gb')) + '</div>' + bar(memPct, memPct >= 80 ? red : (memPct >= 65 ? amber : green)) + '<div class="sub">' + esc(T('ui_ram_free', gb(s.memTotalMb))) + '</div></div>';
+    h += '<div class="card metric"><div class="lbl">' + esc(T('ui_bat')) + '</div><div class="val">' + esc(s.bat) + '%</div>' + bar(+s.bat || 0, (+s.bat || 0) < 20 ? red : green) + '<div class="sub">' + esc(String(s.batTemp).replace('.', (1.5).toLocaleString(S.lang).charAt(1))) + ' °C</div></div>';
+    h += '<div class="card metric"><div class="lbl">' + esc(T('ui_up')) + '</div><div class="val">' + esc(T('ui_days', s.upDays)) + '</div>' + bar(Math.min(100, s.upDays / 14 * 100), s.upDays >= 14 ? amber : green) + '<div class="sub">' + esc(T('ui_up_d')) + '</div></div></div>';
+    h += '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))"><div class="card pad"><h2 style="font-size:18px">' + esc(T('ui_obs')) + '</h2>';
+    var obs = s.obs || [];
+    if (!obs.length) h += '<p style="margin-top:12px;color:var(--muted)">' + esc(T('ui_noobs')) + '</p>';
+    for (var i = 0; i < obs.length; i++) h += '<div class="obs"><span class="dot" style="background:' + (i === 0 ? red : (i < 3 ? amber : '#98A2B3')) + '"></span><span>' + esc(obs[i]) + '</span></div>';
+    h += '</div><div class="card pad"><h2 style="font-size:18px">' + esc(T('ui_apps')) + '</h2>';
+    var apps = s.apps || [], mx = apps.length ? apps[0].min : 1;
+    for (var j = 0; j < apps.length; j++) h += '<div class="approw"><span class="mono" title="' + esc(apps[j].pkg) + '">' + esc(apps[j].pkg) + '</span>' + bar(apps[j].min / mx * 100, 'var(--blue)') + '<span style="text-align:right;color:var(--muted)">' + esc(dur(apps[j].min)) + '</span></div>';
+    h += '</div></div>';
+    if (s.susp && s.susp.length) {
+      h += '<div class="card pad"><h2 style="font-size:18px">' + esc(T('ui_susp')) + '</h2>';
+      for (var k = 0; k < s.susp.length; k++) h += '<div class="obs"><span class="dot" style="background:' + red + '"></span><span><b class="mono">' + esc(s.susp[k].pkg) + '</b> — ' + esc(s.susp[k].why) + '</span></div>';
+      h += '</div>';
+    }
+    if (S.mode === 'opt' && S.stage === 'diag') h += '<div class="note ok">' + ICON.tick + '<span>' + esc(T('ui_cand', s.cand, s.candAuto)) + ' ' + esc(T('ui_to_plan')) + '</span></div>';
+    return h + '</div>';
+  }
+
+  // ---------------------------------------------------------------- events & polling
+  function apply(ev) {
+    var d = ev.data || {};
+    if (ev.type === 'log') addLog(d);
+    else if (ev.type === 'stage') { S.stage = d.s; if (d.mode) S.mode = d.mode; if (S.stageLogFrom[d.s] !== undefined) S.stageLogFrom[d.s] = S.log.length; if (d.s === 'run') S.progress = null; }
+    else if (ev.type === 'device') { S.device = d; $('chipText').textContent = d.model + ' · ' + T(d.wifi ? 'ui_wifi' : 'ui_usb'); $('chip').classList.add('on'); }
+    else if (ev.type === 'summary') S.summary = d;
+    else if (ev.type === 'progress') S.progress = d;
+    else if (ev.type === 'report') { S.report = d; if (d.mode) S.mode = d.mode; }
+    else if (ev.type === 'finished') S.finished = true;
+  }
+  var failures = 0, first = true;
+  function poll() {
+    api('/api/state?since=' + S.seq).then(function (st) {
+      failures = 0; $('offline').classList.remove('on');
+      if (first) { first = false; $('kitver').textContent = 'phone-kit ' + st.kit; if (st.lang && st.lang !== S.lang) loadLang(st.lang); }
+      var changed = false;
+      for (var i = 0; i < st.events.length; i++) { apply(st.events[i]); if (st.events[i].type !== 'log' || S.stage === 'connect' || S.stage === 'run' || S.stage === 'restore' || (S.stage === 'diag' && !S.summary)) changed = true; }
+      S.seq = st.seq;
+      if (st.finished) S.finished = true;
+      var nq = st.question || null, qchanged = (nq ? nq.id : null) !== (S.q ? S.q.id : null);
+      S.q = nq;
+      if (qchanged) { if (!nq) S.qid = null; renderQuestion(false); changed = true; }
+      if (changed) { renderSteps(); renderPanel(); }
+    }).catch(function () {
+      if (++failures >= 4 && !S.closed) $('offline').classList.add('on');
+    }).then(function () { if (!S.closed) setTimeout(poll, S.q ? 600 : 400); });
+  }
+
+  renderLogToggle();
+  api('/api/state?since=0').then(function (st) { return loadLang(st.lang || 'en'); }).catch(function () { $('offline').classList.add('on'); }).then(poll);
+})();
+</script>
+</body>
+</html>

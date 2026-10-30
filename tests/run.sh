@@ -13,10 +13,10 @@ run() {
   local name=$1 brand=$2 input=$3 keep=${4:-}
   local kit="$WORK/kit-$brand"   # один набор на марку: откат находит журнал предыдущего прогона
   mkdir -p "$kit/data"
-  cp "$ROOT/phonekit.ps1" "$kit/"; cp "$ROOT"/data/*.tsv "$kit/data/"
+  cp "$ROOT/phonekit.ps1" "$kit/"; cp "$ROOT"/data/*.tsv "$kit/data/"; mkdir -p "$kit/data/lang"; cp "$ROOT"/data/lang/*.json "$kit/data/lang/"
   export MOCK_BRAND=$brand MOCK_STATE="$WORK/$brand.json"
   [ -z "$keep" ] && rm -f "$MOCK_STATE"
-  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -NoPause > "$WORK/$name.log" 2>&1
+  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoPause > "$WORK/$name.log" 2>&1
 }
 # expect NAME "текст" — текст должен быть в выводе; reject NAME "текст" — не должен
 expect() { if grep -qF -- "$2" "$WORK/$1.log"; then echo "PASS $1: $2"; else echo "FAIL $1: нет «$2»"; FAIL=1; fi; }
@@ -86,6 +86,9 @@ expect w_reboot 'после перезагрузки всё отключённо
 
 # 7. Пункт U на подставных данных Windows
 if pwsh -NoProfile -File "$ROOT/tests/usbtest.ps1"; then echo "PASS usbtest"; else echo "FAIL usbtest"; FAIL=1; fi
+
+# 8. Веб-интерфейс: сервер, ответы по HTTP, смена языка на ходу, отчёт
+if python3 "$ROOT/tests/webtest.py" pwsh; then :; else FAIL=1; fi
 
 if [ $FAIL -ne 0 ]; then echo "=== ЕСТЬ ОШИБКИ, логи: $WORK"; for f in "$WORK"/*.log; do echo "----- $f"; tail -40 "$f"; done; exit 1; fi
 echo "=== ВСЕ ТЕСТЫ ПРОШЛИ"

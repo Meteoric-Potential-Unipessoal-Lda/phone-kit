@@ -2,6 +2,9 @@
 # Запуск: pwsh -File tests/usbtest.ps1 (или powershell.exe на Windows). Код выхода 1 — если какой-то случай не совпал.
 $ErrorActionPreference = 'Stop'
 $src = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot '../phonekit.ps1')
+$Root = Join-Path $PSScriptRoot '..'; $Lang = 'ru'
+$a = $src.IndexOf('$KitLangs = '); $b = $src.IndexOf('function Say(')
+Invoke-Expression $src.Substring($a, $b - $a)
 $a = $src.IndexOf('function Say('); $b = $src.IndexOf('function Finish(')
 Invoke-Expression $src.Substring($a, $b - $a)
 $a = $src.IndexOf('$PhoneVids = '); $b = $src.IndexOf('function Show-EnableHelp')

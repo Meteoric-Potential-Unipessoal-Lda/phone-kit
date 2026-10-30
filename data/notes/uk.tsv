@@ -1,0 +1,128 @@
+package	note
+com.samsung.android.rubin.app	Samsung: сервіс персоналізації (збір даних для рекомендацій)
+com.samsung.android.mapsagent	Samsung: довстановлює «рекомендовані» додатки
+com.samsung.android.app.omcagent	Samsung: довстановлює додатки оператора/партнерів
+com.samsung.android.ipsgeofence	Samsung Visit In: геозони для реклами
+com.samsung.android.app.spage	Samsung Free: стрічка ліворуч на робочому столі
+com.samsung.android.app.tips	Samsung: «Поради»
+com.samsung.android.mateagent	Samsung: Galaxy Friends
+com.samsung.android.voc	Samsung Members (підтримка й діагностика)
+com.samsung.android.bixby.agent	Bixby (голосовий помічник)
+com.samsung.android.bixby.wakeup	Bixby: пробудження голосом
+com.samsung.android.bixbyvision.framework	Bixby Vision: розпізнавання тексту в камері й галереї
+com.samsung.android.visionintelligence	Bixby Vision
+com.samsung.android.arzone	Samsung AR Zone
+com.samsung.android.aremoji	Samsung AR-емодзі
+com.samsung.android.ardrawing	Samsung AR-малювання
+com.samsung.android.livestickers	Samsung: живі стікери
+com.samsung.android.stickercenter	Samsung: центр стікерів
+com.samsung.android.oneconnect	SmartThings (розумний дім)
+com.samsung.android.beaconmanager	SmartThings: пошук пристроїв поруч
+com.samsung.android.mdx	Зв’язок з Windows
+com.microsoft.appmanager	Зв’язок з Windows (Microsoft)
+com.sec.android.easyMover	Smart Switch (перенесення даних)
+com.samsung.android.smartswitchassistant	Smart Switch: помічник
+com.samsung.android.app.watchmanagerstub	заглушка Galaxy Watch (якщо годинника немає — можна)
+com.sec.android.app.shealth	Samsung Health
+com.samsung.android.app.reminder	Нагадування Samsung
+com.samsung.android.game.gamehome	Game Launcher
+com.samsung.android.fmm	Знайти пристрій (захист від крадіжки)
+com.sec.spp.push	push-сповіщення Samsung (від них залежить «Знайти пристрій»)
+com.samsung.android.scloud	Samsung Cloud (резервні копії)
+com.samsung.android.sm.devicesecurity	антивірус в «Обслуговуванні пристрою»
+com.samsung.android.dqagent	Samsung: агент діагностики якості
+com.samsung.android.app.cocktailbarservice	панелі Edge (на планшеті може зламати розділення екрана)
+com.samsung.android.app.appsedge	панель Edge «Додатки»
+com.samsung.android.app.taskedge	панель Edge «Завдання»
+com.samsung.android.smartmirroring	Smart View (трансляція на ТВ)
+com.samsung.android.app.sharelive	Quick Share (обмін файлами)
+com.samsung.android.da.daagent	Dual Messenger (другі копії месенджерів зникнуть)
+com.samsung.android.samsungpass	Samsung Pass (паролі)
+com.samsung.android.themestore	Galaxy Themes (тема може скинутися)
+com.sec.android.app.sbrowser	Samsung Internet
+com.samsung.android.game.gos	Game Optimizing Service: продуктивність і нагрів в іграх
+com.samsung.android.kgclient	КРИТИЧНО: блокує телефон у разі вимкнення
+com.samsung.android.smartsuggestions	підказки One UI (наслідки неясні)
+com.samsung.android.app.routines	Режими та процедури
+com.samsung.android.lool	Обслуговування пристрою
+com.osp.app.signin	Samsung Account (без нього падають Налаштування)
+com.samsung.android.scs	Samsung Core Services
+com.samsung.android.mobileservice	Samsung: сервіси акаунта
+com.sec.android.app.samsungapps	Galaxy Store (оновлює системні додатки Samsung)
+com.wssyncmldm	оновлення ПЗ Samsung
+com.sec.android.soagent	оновлення ПЗ Samsung
+com.samsung.android.app.aodservice	Always On Display
+com.sec.android.diagmonagent	діагностика Samsung (система перезапускає)
+com.samsung.android.dsms	діагностика Samsung (система перезапускає)
+com.facebook.appmanager	передвстановлений Facebook: менеджер оновлень (сам додаток залишиться)
+com.facebook.services	передвстановлений Facebook: служби
+com.facebook.system	передвстановлений Facebook: інсталятор
+com.netflix.partner.activation	партнерська заглушка Netflix
+com.microsoft.skydrive	OneDrive
+com.microsoft.office.officehubrow	Microsoft Office
+com.linkedin.android	LinkedIn
+com.miui.msa.global	Xiaomi: реклама в системі (MSA)
+com.miui.analytics	Xiaomi: аналітика
+com.miui.daemon	Xiaomi: збір даних
+com.miui.hybrid	Xiaomi: «Швидкі додатки» (реклама)
+com.miui.hybrid.accessory	Xiaomi: «Швидкі додатки»
+com.miui.yellowpage	Xiaomi: Жовті сторінки
+com.xiaomi.glgm	Xiaomi: ігровий центр
+com.miui.bugreport	Xiaomi: звіти про помилки
+com.miui.contentextension	Xiaomi Taplus: підказки за виділеним текстом
+com.miui.android.fashiongallery	Xiaomi: «Карусель шпалер» (реклама на екрані блокування)
+com.xiaomi.mipicks	Xiaomi GetApps (магазин із рекламою)
+com.mi.globalminusscreen	Xiaomi: стрічка App Vault ліворуч на робочому столі
+com.miui.personalassistant	Xiaomi: стрічка App Vault
+com.miui.cleaner	Xiaomi: Очищення (частина «Безпеки»)
+com.miui.guardprovider	Xiaomi: антивірус «Безпеки»
+com.miui.cloudservice	Mi Cloud
+com.miui.cloudbackup	Mi Cloud: резервні копії
+com.miui.micloudsync	Mi Cloud: синхронізація
+com.android.thememanager	Xiaomi Теми (шпалери й значки можуть скинутися)
+com.miui.player	Xiaomi Музика
+com.miui.videoplayer	Xiaomi Відео
+com.mi.globalbrowser	Mi Браузер
+com.android.browser	браузер виробника
+com.miui.notes	Xiaomi Нотатки
+com.miui.compass	Компас
+com.miui.weather2	Погода Xiaomi
+com.miui.calculator	Калькулятор
+com.miui.fm	Радіо
+com.xiaomi.midrop	ShareMe
+com.miui.mishare.connectivity	Mi Share
+com.xiaomi.scanner	Сканер
+com.mi.health	Mi Health
+com.xiaomi.payment	Mi Pay
+com.mipay.wallet	Mi Pay
+com.miui.voiceassist	голосовий помічник Xiaomi
+com.miui.virtualsim	віртуальна SIM Xiaomi
+com.miui.miservice	Xiaomi: сервіси та зворотний зв’язок
+com.miui.huanji	Mi Mover (перенесення даних)
+com.xiaomi.joyose	Xiaomi: тепловий режим і продуктивність в іграх
+com.miui.powerkeeper	Xiaomi: керування батареєю
+com.miui.securitycenter	Xiaomi «Безпека» (ламає систему)
+com.lbe.security.miui	Xiaomi: менеджер дозволів
+com.xiaomi.finddevice	Xiaomi: Знайти пристрій
+com.xiaomi.account	Mi акаунт
+com.xiaomi.xmsf	Xiaomi: push-сервіс (сповіщення, Знайти пристрій)
+com.miui.miwallpaper	Xiaomi: шпалери
+com.miui.securitycore	Xiaomi: другий простір і захист додатків
+com.miui.securityadd	Xiaomi: частина «Безпеки»
+com.xiaomi.discover	Xiaomi: оновлення системних додатків
+com.google.android.apps.turbo	Device Health Services (ламає налаштування батареї)
+com.google.android.apps.wellbeing	Цифрове благополуччя (потрібне для батьківського контролю)
+com.google.android.youtube	YouTube
+com.google.android.apps.youtube.music	YouTube Music
+com.google.android.videos	Google TV (фільми)
+com.google.android.apps.tachyon	Google Meet
+com.google.android.apps.docs	Google Диск
+com.google.android.apps.maps	Google Карти
+com.google.android.gm	Gmail
+com.google.android.apps.photos	Google Фото
+com.google.android.feedback	Google: надсилання відгуків
+com.google.android.marvin.talkback	TalkBack (для людей із вадами зору)
+com.google.android.googlequicksearchbox	додаток Google (пошук, «Окей, Google»)
+com.google.android.as	Android System Intelligence (розумні підказки)
+com.google.android.apps.subscriptions.red	Google One
+com.google.android.projection.gearhead	Android Auto

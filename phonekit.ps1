@@ -17,6 +17,9 @@
     -Label Максим        метка клиента для папки отчёта
     -AdbPath путь/adb    свой adb
     -NoPause             не ждать Enter в конце
+    -Lang en             язык (ru uk en pt es fr it de lv pl); по умолчанию — язык системы
+    -Console             только консоль, без страницы в браузере
+    -Web -NoBrowser      страница без автозапуска браузера (адрес печатается в консоли)
 
   База пакетов (data/uad.tsv) — из Universal Android Debloater Next Generation
   (github.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation, GPL-3.0),
@@ -27,32 +30,247 @@ param(
   [string]$Address = '',
   [string]$Label = '',
   [string]$AdbPath = '',
+  [string]$Lang = '',
+  [switch]$Console,
+  [switch]$Web,
+  [switch]$NoBrowser,
   [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '0.8'
+$KitVersion = '0.9'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
 $IsWin = ($env:OS -eq 'Windows_NT')
 $IsMac = (-not $IsWin) -and (Test-Path '/System/Library/CoreServices/Finder.app')
 
+# ----------------------------------------------------------------- языки
+# Все тексты — в data/lang/<код>.json (ключ -> шаблон с {0}, {1}...). Нет перевода — английский, потом русский.
+$KitLangs = @('ru', 'uk', 'en', 'pt', 'es', 'fr', 'it', 'de', 'lv', 'pl')
+function Read-LangFile([string]$code) {
+  $h = @{}
+  $p = Join-Path (Join-Path (Join-Path $Root 'data') 'lang') ($code + '.json')
+  if (Test-Path -LiteralPath $p) {
+    try { $o = (Get-Content -LiteralPath $p -Raw -Encoding UTF8) | ConvertFrom-Json; foreach ($pr in $o.PSObject.Properties) { $h[$pr.Name] = [string]$pr.Value } } catch {}
+  }
+  return ,$h
+}
+function Set-KitLang([string]$code) {
+  $code = ([string]$code).ToLower()
+  if ($KitLangs -notcontains $code) { $code = 'en' }
+  $script:Lang = $code
+  $script:Tr = Read-LangFile $code
+}
+$script:TrRu = Read-LangFile 'ru'
+$script:TrEn = Read-LangFile 'en'
+if (-not $Lang) { try { $Lang = [Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName } catch { $Lang = 'en' } }
+Set-KitLang $Lang
+function L([string]$k) {
+  $t = $script:Tr[$k]
+  if (-not $t) { $t = $script:TrEn[$k] }
+  if (-not $t) { $t = $script:TrRu[$k] }
+  if (-not $t) { return $k }
+  if ($args.Count) { return ($t -f @($args | ForEach-Object { [string]$_ })) }
+  return $t
+}
+
+# ----------------------------------------------------------------- интерфейс в браузере
+# Страница ui/index.html на этом же компьютере (127.0.0.1, случайный порт и ключ в адресе).
+# Сервер — в отдельном потоке (runspace); общение — через синхронизированную таблицу $script:WebUi.
+# Отвечать можно и на странице, и в консоли: что первое — то и принято.
+$script:WebUi = $null
+function Sync-Web {
+  $w = $script:WebUi
+  if (-not $w) { return }
+  $lr = $w.langReq
+  if ($lr) { $w.langReq = $null; Set-KitLang $lr; $w.lang = $script:Lang }
+}
+function Emit([string]$type, $data) {
+  $w = $script:WebUi
+  if (-not $w) { return }
+  [System.Threading.Monitor]::Enter($w.SyncRoot)
+  try { $w.seq = [int]$w.seq + 1; [void]$w.events.Add([ordered]@{ seq = $w.seq; type = $type; data = $data }) }
+  finally { [System.Threading.Monitor]::Exit($w.SyncRoot) }
+  Sync-Web
+}
+# kind: text | code6 | addr | menu | confirm | enter | plan;  options: @(@{ key; label }), extra: что угодно для страницы
+function Ask([string]$prompt, [string]$kind = 'text', $options = $null, $extra = $null) {
+  $w = $script:WebUi
+  if (-not $w) { return ([string](Read-Host $prompt)).Trim() }
+  $id = [guid]::NewGuid().ToString('N').Substring(0, 10)
+  $q = [ordered]@{ id = $id; prompt = $prompt; kind = $kind; options = $options; extra = $extra }
+  [System.Threading.Monitor]::Enter($w.SyncRoot)
+  try { $w.answer = $null; $w.question = $q } finally { [System.Threading.Monitor]::Exit($w.SyncRoot) }
+  Write-Host ($prompt + ': ') -NoNewline
+  $buf = ''; $canKey = $true
+  while ($true) {
+    $ans = $null
+    [System.Threading.Monitor]::Enter($w.SyncRoot)
+    try { if ($w.answer -and $w.answer.id -eq $id) { $ans = [string]$w.answer.value; $w.answer = $null; $w.question = $null } }
+    finally { [System.Threading.Monitor]::Exit($w.SyncRoot) }
+    if ($null -ne $ans) { if ($kind -eq 'plan') { Write-Host '' } else { Write-Host $ans }; return $ans.Trim() }
+    Sync-Web
+    if ($canKey) {
+      try {
+        while ([Console]::KeyAvailable) {
+          $k = [Console]::ReadKey($true)
+          if ($k.Key -eq 'Enter') {
+            Write-Host ''
+            [System.Threading.Monitor]::Enter($w.SyncRoot); try { $w.question = $null } finally { [System.Threading.Monitor]::Exit($w.SyncRoot) }
+            return $buf.Trim()
+          } elseif ($k.Key -eq 'Backspace') { if ($buf.Length) { $buf = $buf.Substring(0, $buf.Length - 1); Write-Host "`b `b" -NoNewline } }
+          elseif ([int]$k.KeyChar -ge 32) { $buf += $k.KeyChar; Write-Host $k.KeyChar -NoNewline }
+        }
+      } catch { $canKey = $false }
+    }
+    Start-Sleep -Milliseconds 120
+  }
+}
+function Opt([string]$key, [string]$label) { return [ordered]@{ key = $key; label = $label } }
+
+$WebServer = {
+  param($W, $Listener, $Html, $LangDir, $Token)
+  function Send($c, [int]$code, [string]$ctype, [byte[]]$body) {
+    $st = $c.GetStream()
+    $h = "HTTP/1.1 $code OK`r`nContent-Type: $ctype`r`nContent-Length: $($body.Length)`r`nCache-Control: no-store`r`nX-Content-Type-Options: nosniff`r`nConnection: close`r`n`r`n"
+    $hb = [Text.Encoding]::ASCII.GetBytes($h)
+    $st.Write($hb, 0, $hb.Length); if ($body.Length) { $st.Write($body, 0, $body.Length) }; $st.Flush()
+  }
+  function SendText($c, [int]$code, [string]$ctype, [string]$text) { Send $c $code $ctype ([Text.Encoding]::UTF8.GetBytes($text)) }
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  while (-not $W.stop) {
+    try {
+      if (-not $Listener.Pending()) { Start-Sleep -Milliseconds 30; continue }
+      $c = $Listener.AcceptTcpClient()
+    } catch { Start-Sleep -Milliseconds 100; continue }
+    try {
+      $c.ReceiveTimeout = 3000; $c.SendTimeout = 3000
+      $st = $c.GetStream()
+      $buf = New-Object byte[] 16384; $ms = New-Object System.IO.MemoryStream; $hdrEnd = -1
+      while ($hdrEnd -lt 0 -and $ms.Length -lt 65536) {
+        $n = $st.Read($buf, 0, $buf.Length); if ($n -le 0) { break }
+        $ms.Write($buf, 0, $n)
+        $hdrEnd = [Text.Encoding]::ASCII.GetString($ms.ToArray()).IndexOf("`r`n`r`n")
+      }
+      if ($hdrEnd -lt 0) { continue }
+      $all = $ms.ToArray()
+      $head = [Text.Encoding]::ASCII.GetString($all, 0, $hdrEnd)
+      $lines = $head -split "`r`n"
+      $parts = $lines[0] -split ' '
+      $method = $parts[0]; $target = $parts[1]
+      $len = 0
+      foreach ($hl in $lines) { if ($hl -match '^(?i)content-length:\s*(\d+)') { $len = [int]$Matches[1] } }
+      $bodyBytes = New-Object System.IO.MemoryStream
+      $have = $all.Length - ($hdrEnd + 4)
+      if ($have -gt 0) { $bodyBytes.Write($all, $hdrEnd + 4, $have) }
+      while ($bodyBytes.Length -lt $len -and $len -le 1048576) { $n = $st.Read($buf, 0, $buf.Length); if ($n -le 0) { break }; $bodyBytes.Write($buf, 0, $n) }
+      $body = $utf8.GetString($bodyBytes.ToArray())
+      $path = $target; $query = ''
+      $qi = $target.IndexOf('?'); if ($qi -ge 0) { $path = $target.Substring(0, $qi); $query = $target.Substring($qi + 1) }
+      $qs = @{}
+      foreach ($kv in ($query -split '&')) { $p2 = $kv -split '=', 2; if ($p2.Count -eq 2) { $qs[$p2[0]] = [Uri]::UnescapeDataString($p2[1]) } }
+      if ($path -eq '/' -or $path -eq '/index.html') { SendText $c 200 'text/html; charset=utf-8' $Html; continue }
+      if ($path -eq '/favicon.ico') { Send $c 404 'text/plain' (New-Object byte[] 0); continue }
+      if (-not $path.StartsWith('/api/') -or $qs['t'] -ne $Token) { SendText $c 403 'text/plain' 'forbidden'; continue }
+      if ($path -eq '/api/state' -and $method -eq 'GET') {
+        $since = 0; [void][int]::TryParse([string]$qs['since'], [ref]$since)
+        [System.Threading.Monitor]::Enter($W.SyncRoot)
+        try {
+          $evs = New-Object System.Collections.ArrayList
+          foreach ($e in $W.events) { if ($e.seq -gt $since) { [void]$evs.Add($e) } }
+          $resp = [ordered]@{ seq = $W.seq; events = $evs.ToArray(); question = $W.question; lang = $W.lang; finished = [bool]$W.finished; kit = $W.kit }
+        } finally { [System.Threading.Monitor]::Exit($W.SyncRoot) }
+        SendText $c 200 'application/json; charset=utf-8' ($resp | ConvertTo-Json -Depth 10 -Compress); continue
+      }
+      if ($path -eq '/api/lang' -and $method -eq 'GET') {
+        $code = [string]$qs['code']
+        if ($code -notmatch '^[a-z]{2}$') { SendText $c 400 'text/plain' 'bad'; continue }
+        $f = Join-Path $LangDir ($code + '.json')
+        if (-not (Test-Path -LiteralPath $f)) { SendText $c 200 'application/json; charset=utf-8' '{}'; continue }
+        Send $c 200 'application/json; charset=utf-8' ([IO.File]::ReadAllBytes($f)); continue
+      }
+      if ($method -eq 'POST') {
+        $o = $null; try { $o = $body | ConvertFrom-Json } catch {}
+        if ($path -eq '/api/answer' -and $o) {
+          [System.Threading.Monitor]::Enter($W.SyncRoot)
+          try { if ($W.question -and $W.question.id -eq [string]$o.id) { $W.answer = @{ id = [string]$o.id; value = [string]$o.value } } }
+          finally { [System.Threading.Monitor]::Exit($W.SyncRoot) }
+          SendText $c 200 'application/json' '{"ok":true}'; continue
+        }
+        if ($path -eq '/api/lang' -and $o -and ([string]$o.code -match '^[a-z]{2}$')) { $W.langReq = [string]$o.code; $W.lang = [string]$o.code; SendText $c 200 'application/json' '{"ok":true}'; continue }
+        if ($path -eq '/api/close') { $W.closeReq = $true; SendText $c 200 'application/json' '{"ok":true}'; continue }
+      }
+      SendText $c 404 'text/plain' 'not found'
+    } catch {
+    } finally { try { $c.Close() } catch {} }
+  }
+  try { $Listener.Stop() } catch {}
+}
+
+function Start-Web {
+  $uiFile = Join-Path (Join-Path $Root 'ui') 'index.html'
+  if (-not (Test-Path -LiteralPath $uiFile)) { return $false }
+  $html = [IO.File]::ReadAllText($uiFile, [Text.Encoding]::UTF8)
+  $chars = 'abcdefghijkmnpqrstuvwxyz23456789'.ToCharArray()
+  $token = -join (1..20 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
+  $listener = $null; $port = 0
+  foreach ($p in (8731..8760)) {
+    try { $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $p); $l.Start(); $listener = $l; $port = $p; break } catch {}
+  }
+  if (-not $listener) { return $false }
+  $w = [hashtable]::Synchronized(@{ events = (New-Object System.Collections.ArrayList); seq = 0; question = $null; answer = $null; lang = $script:Lang; langReq = $null; stop = $false; finished = $false; closeReq = $false; kit = $KitVersion })
+  $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
+  $ps = [powershell]::Create(); $ps.Runspace = $rs
+  [void]$ps.AddScript($WebServer).AddArgument($w).AddArgument($listener).AddArgument($html).AddArgument((Join-Path (Join-Path $Root 'data') 'lang')).AddArgument($token)
+  $script:WebAsync = $ps.BeginInvoke(); $script:WebPs = $ps
+  $script:WebUi = $w
+  $script:WebUrl = "http://127.0.0.1:$port/?t=$token"
+  Say (L 'w001' $script:WebUrl) 'Cyan'
+  Say (L 'w002') 'DarkGray'
+  if (-not $NoBrowser) {
+    try {
+      if ($IsWin) { Start-Process $script:WebUrl }
+      elseif ($IsMac) { & open $script:WebUrl }
+      else { & xdg-open $script:WebUrl 2>$null }
+    } catch { Warn (L 'w003') }
+  }
+  return $true
+}
+function Stop-Web {
+  $w = $script:WebUi
+  if (-not $w) { return }
+  $w.finished = $true
+  Emit 'finished' @{}
+  if (-not $NoPause) {
+    Say (L 'w004') 'Cyan'
+    $until = (Get-Date).AddMinutes(30)
+    while (-not $w.closeReq -and (Get-Date) -lt $until) {
+      try { if ([Console]::KeyAvailable) { [void][Console]::ReadKey($true); break } } catch {}
+      Start-Sleep -Milliseconds 200
+    }
+  } else { Start-Sleep -Milliseconds 1500 }
+  $w.stop = $true
+  Start-Sleep -Milliseconds 300
+  $script:WebUi = $null
+}
+
 # ----------------------------------------------------------------- вывод
 
-function Say([string]$t, [string]$c = 'Gray') { Write-Host $t -ForegroundColor $c }
-function Title([string]$t) { Write-Host ''; Write-Host ('== ' + $t) -ForegroundColor Cyan }
-function Ok([string]$t) { Write-Host ('  [ok] ' + $t) -ForegroundColor Green }
-function Warn([string]$t) { Write-Host ('  [!] ' + $t) -ForegroundColor Yellow }
-function Bad([string]$t) { Write-Host ('  [x] ' + $t) -ForegroundColor Red }
+function Say([string]$t, [string]$c = 'Gray') { Write-Host $t -ForegroundColor $c; Emit 'log' @{ k = 'say'; c = $c; t = $t } }
+function Title([string]$t) { Write-Host ''; Write-Host ('== ' + $t) -ForegroundColor Cyan; Emit 'log' @{ k = 'title'; t = $t } }
+function Ok([string]$t) { Write-Host ('  [ok] ' + $t) -ForegroundColor Green; Emit 'log' @{ k = 'ok'; t = $t } }
+function Warn([string]$t) { Write-Host ('  [!] ' + $t) -ForegroundColor Yellow; Emit 'log' @{ k = 'warn'; t = $t } }
+function Bad([string]$t) { Write-Host ('  [x] ' + $t) -ForegroundColor Red; Emit 'log' @{ k = 'bad'; t = $t } }
 
 function Finish([int]$code) {
   # Останавливаем свой adb-сервер: иначе adb остаётся в памяти и папку у клиента не удалить.
   if ($script:Adb -and $script:AdbStarted) {
     try { [void](Invoke-Adb @('kill-server') 10) } catch {}
   }
-  if (-not $NoPause) { Write-Host ''; [void](Read-Host 'Enter — закрыть окно') }
+  if ($script:WebUi) { Stop-Web }
+  elseif (-not $NoPause) { Write-Host ''; [void](Read-Host (L 'm001')) }
   exit $code
 }
 
@@ -122,9 +340,9 @@ function Test-ReadOnly([string]$cmd) {
 }
 
 function ShOn([string]$serial, [string]$cmd, [int]$TimeoutSec = 40) {
-  if (-not (Test-ReadOnly $cmd)) { throw "Команда не из списка чтения, не отправлена: $cmd" }
+  if (-not (Test-ReadOnly $cmd)) { throw (L 'm002' $cmd) }
   $r = Invoke-Adb @('-s', $serial, 'shell', $cmd) $TimeoutSec
-  if ($r.TimedOut) { if ($script:Notes) { [void]$script:Notes.Add("Команда не ответила за $TimeoutSec с: $cmd") }; return '' }
+  if ($r.TimedOut) { if ($script:Notes) { [void]$script:Notes.Add((L 'm003' $TimeoutSec $cmd)) }; return '' }
   return ($r.Out -replace "`r", '')
 }
 function Sh([string]$cmd, [int]$TimeoutSec = 40) { return (ShOn $script:Serial $cmd $TimeoutSec) }
@@ -137,7 +355,7 @@ function Get-PlatformTools([string]$os, [string]$dest) {
 function Get-AdbBinary {
   if ($AdbPath) {
     if (Test-Path $AdbPath) { return (Resolve-Path $AdbPath).Path }
-    Bad "Не найден adb: $AdbPath"; Finish 1
+    Bad (L 'm004' $AdbPath); Finish 1
   }
   $tools = Join-Path $Root 'tools'
   if ($IsWin) { $local = Join-Path $tools 'platform-tools/adb.exe' }
@@ -149,9 +367,9 @@ function Get-AdbBinary {
   if (-not $Prepare) {
     $cmd = Get-Command adb -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
-    Warn 'В папке tools нет ADB для этой системы — качаю сейчас.'
+    Warn (L 'm005')
   }
-  Say 'Скачиваю ADB (platform-tools) с сайта Google, ~15 МБ...'
+  Say (L 'm006')
   try {
     New-Item -ItemType Directory -Force -Path $tools | Out-Null
     if ($IsWin) {
@@ -168,61 +386,61 @@ function Get-AdbBinary {
       & chmod +x $local
     }
   } catch {
-    Bad ('Не удалось скачать ADB: ' + $_.Exception.Message)
-    Say 'Скачайте вручную: https://developer.android.com/tools/releases/platform-tools'
+    Bad ((L 'm007') + $_.Exception.Message)
+    Say (L 'm008')
     Finish 1
   }
-  if (Test-Path $local) { Ok 'ADB скачан'; return $local }
-  Bad 'ADB скачан, но adb не найден'; Finish 1
+  if (Test-Path $local) { Ok (L 'm009'); return $local }
+  Bad (L 'm010'); Finish 1
 }
 
 # Подготовка папки у мастера: ADB для Windows и Mac, PowerShell для Mac (берём из соседнего tv-kit, если он есть)
 function Invoke-Prepare {
-  Say "Телефон-набор $KitVersion — подготовка папки (у себя, один раз)" 'Cyan'
+  Say (L 'm011' $KitVersion) 'Cyan'
   $tools = Join-Path $Root 'tools'
   New-Item -ItemType Directory -Force -Path $tools | Out-Null
   $tv = Join-Path (Split-Path $Root -Parent) 'tv-kit/tools'
   if (Test-Path $tv) {
-    Say "Нашёл соседний tv-kit — беру ADB и PowerShell для Mac оттуда: $tv"
+    Say (L 'm012' $tv)
     foreach ($n in @('platform-tools', 'platform-tools-darwin.zip', 'pwsh-osx-arm64.tar.gz', 'pwsh-osx-x64.tar.gz', 'pwsh-7.4.6-hashes.sha256')) {
       $src = Join-Path $tv $n
       $dst = Join-Path $tools $n
-      if ((Test-Path $src) -and -not (Test-Path $dst)) { Copy-Item -Path $src -Destination $dst -Recurse -Force; Ok "скопировано: $n" }
+      if ((Test-Path $src) -and -not (Test-Path $dst)) { Copy-Item -Path $src -Destination $dst -Recurse -Force; Ok (L 'm013' $n) }
     }
   }
   $script:Adb = Get-AdbBinary
   $macZip = Join-Path $tools 'platform-tools-darwin.zip'
   if ($IsWin -and -not (Test-Path $macZip)) {
-    try { Say 'Скачиваю ADB для Mac...'; Get-PlatformTools 'darwin' $macZip; Ok 'ADB для Mac скачан' } catch { Warn ('ADB для Mac не скачался: ' + $_.Exception.Message) }
+    try { Say (L 'm014'); Get-PlatformTools 'darwin' $macZip; Ok (L 'm015') } catch { Warn ((L 'm016') + $_.Exception.Message) }
   }
   $ud = Join-Path $tools 'usb_driver'
   if ($IsWin -and -not (Test-Path (Join-Path $ud 'android_winusb.inf'))) {
     try {
-      Say 'Скачиваю Google USB Driver (для телефонов, которые Windows не видит по кабелю)...'
+      Say (L 'm017')
       $uz = Join-Path $env:TEMP 'usb_driver_r13-windows.zip'
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
       Invoke-WebRequest -UseBasicParsing -Uri 'https://dl.google.com/android/repository/usb_driver_r13-windows.zip' -OutFile $uz
       Expand-Archive -Path $uz -DestinationPath $tools -Force
       Remove-Item $uz -Force -ErrorAction SilentlyContinue
-      if (Test-Path (Join-Path $ud 'android_winusb.inf')) { Ok 'Google USB Driver в tools/usb_driver' } else { Warn 'Google USB Driver распакован, но android_winusb.inf не найден' }
-    } catch { Warn ('Google USB Driver не скачался: ' + $_.Exception.Message) }
+      if (Test-Path (Join-Path $ud 'android_winusb.inf')) { Ok (L 'm018') } else { Warn (L 'm019') }
+    } catch { Warn ((L 'm020') + $_.Exception.Message) }
   }
   foreach ($arch in @('arm64', 'x64')) {
     $f = Join-Path $tools "pwsh-osx-$arch.tar.gz"
     if (-not (Test-Path $f)) {
       try {
-        Say "Скачиваю PowerShell 7.4.6 для Mac ($arch) с GitHub..."
+        Say (L 'm021' $arch)
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -UseBasicParsing -Uri ("https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-osx-$arch.tar.gz") -OutFile $f
-        Ok "PowerShell для Mac ($arch) скачан"
-      } catch { Warn ("PowerShell для Mac ($arch) не скачался: " + $_.Exception.Message) }
+        Ok (L 'm022' $arch)
+      } catch { Warn ((L 'm023' $arch) + $_.Exception.Message) }
     }
   }
   $v = Invoke-Adb @('version') 15
   Ok ("ADB: " + $script:Adb)
   Say ('  ' + (($v.Out -split "`n")[0..1] -join ' / '))
-  if (Test-Path (Join-Path $Root 'data/uad.tsv')) { Ok 'База пакетов data/uad.tsv на месте' } else { Warn 'Нет data/uad.tsv — без неё набор не предложит, что отключать' }
-  Say 'Готово. Папку phone-kit целиком копируйте клиенту через AnyDesk (Windows: start.bat, Mac: start.command).' 'Cyan'
+  if (Test-Path (Join-Path $Root 'data/uad.tsv')) { Ok (L 'm024') } else { Warn (L 'm025') }
+  Say (L 'm026') 'Cyan'
   Finish 0
 }
 
@@ -253,22 +471,22 @@ function Test-Addr([string]$a) { return ($a -match '^\d{1,3}(\.\d{1,3}){3}:\d{2,
 # Чистим ввод IP:порт: пробелы, запятые вместо точек, «IP 192.168.1.5 порт 41234»
 function Read-Addr([string]$q) {
   while ($true) {
-    $a = ([string](Read-Host $q)).Trim()
+    $a = Ask $q 'addr'
     if ($a -eq '') { return '' }
     $a = ($a -replace ',', '.') -replace '\s+', ''
     if ($a -match '(\d{1,3}(?:\.\d{1,3}){3}):?(\d{2,5})') { $a = $Matches[1] + ':' + $Matches[2] }
     if (Test-Addr $a) { return $a }
-    Warn 'Нужно IP и порт через двоеточие, например 192.168.1.50:37123 (не шестизначный код).'
+    Warn (L 'm027')
   }
 }
 
 function Connect-Addr([string]$target) {
   if ($target -notmatch ':\d+$') { $target = "${target}:5555" }
-  Say "  подключаюсь к $target ..."
+  Say (L 'm028' $target)
   $r = Invoke-Adb @('connect', $target) 20
   $txt = ($r.Out + ' ' + $r.Err).Trim()
   if ($txt -match 'connected to|already connected') { return $target }
-  Warn "Не подключилось: $txt"
+  Warn (L 'm029' $txt)
   if (-not $IsWin -and $txt -match 'No route to host|EHOSTUNREACH') { Show-MacLanHelp }
   return $null
 }
@@ -279,8 +497,8 @@ function Wait-Authorized([string]$serial) {
     $d = Get-AdbDevices | Where-Object { $_.Serial -eq $serial }
     if ($d -and $d.State -eq 'device') { return $true }
     if (-not $shown) {
-      Warn 'Разблокируй телефон: на экране должен появиться запрос «Разрешить отладку по USB?».'
-      Warn 'Отметь «Всегда разрешать с этого компьютера» и нажми «Разрешить». Жду до 2 минут...'
+      Warn (L 'm030')
+      Warn (L 'm031')
       $shown = $true
     }
     Start-Sleep -Seconds 2
@@ -298,11 +516,11 @@ function Show-OtherAdb {
   $mine = ''; try { $mine = (Resolve-Path $script:Adb).Path } catch {}
   $others = @(Get-Process -Name adb -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -ne $mine })
   if (-not $others.Count) { return $false }
-  Warn 'Работает чужой adb — его запустила другая программа, он перехватывает телефон (отсюда «offline»):'
+  Warn (L 'm032')
   foreach ($o in $others) { Say ("    {0}" -f $o.Path) }
-  Say '  Обычно это Mi Assistant / Xiaomi PC Suite, Samsung Smart Switch, HiSuite, Android Studio, scrcpy, Vysor. Закрой программу.'
-  if (Confirm-Yes 'Остановить чужие adb сейчас? (да / Enter — нет)') {
-    foreach ($o in $others) { try { Stop-Process -Id $o.Id -Force; Ok ("остановлен {0}" -f $o.Path) } catch { Warn ('не остановился: ' + $_.Exception.Message) } }
+  Say (L 'm033')
+  if (Confirm-Yes (L 'm034') (L 'w010')) {
+    foreach ($o in $others) { try { Stop-Process -Id $o.Id -Force; Ok ((L 'm035') -f $o.Path) } catch { Warn ((L 'm036') + $_.Exception.Message) } }
     [void](Invoke-Adb @('kill-server') 15); [void](Invoke-Adb @('start-server') 30)
   }
   return $true
@@ -310,29 +528,29 @@ function Show-OtherAdb {
 
 function Show-OfflineHelp {
   Say ''
-  Warn 'Телефон виден, но «offline» — связь по USB есть, а договориться adb с телефоном не может.'
+  Warn (L 'm037')
   [void](Show-OtherAdb)
-  Say '  1) Разблокируй телефон и посмотри, нет ли окна «Разрешить отладку по USB?» — нажми «Разрешить» (галочка «Всегда»).'
-  Say '  2) Окна нет: «Для разработчиков» -> «Отозвать авторизацию отладки по USB», выключить и включить «Отладку по USB», вынуть и вставить кабель.'
-  Say '  3) Не помогло: другой порт (прямо в ноутбуке, лучше USB 2.0) и другой кабель — «offline» часто из-за кабеля или хаба.'
-  Say '  Набор продолжает ждать — сделай шаги, он подхватит телефон сам.'
+  Say (L 'm038')
+  Say (L 'm039')
+  Say (L 'm040')
+  Say (L 'm041')
 }
 
 function Show-MacLanHelp {
   Say ''
-  Say 'macOS не пускает Терминал в локальную сеть (защита «Локальная сеть»).' 'Yellow'
-  Say '  Системные настройки -> Конфиденциальность и безопасность -> Локальная сеть -> включить «Терминал»,' 'Yellow'
-  Say '  потом полностью закрыть Терминал (Cmd+Q) и запустить набор заново.' 'Yellow'
+  Say (L 'm042') 'Yellow'
+  Say (L 'm043') 'Yellow'
+  Say (L 'm044') 'Yellow'
 }
 
 
 # Проверка кабельного подключения: что видит сама Windows (без драйверов adb не увидит телефон, даже если Windows его видит)
 $PhoneVids = 'VID_(2717|04E8|18D1|22B8|12D1|339B|2A70|0BB4|1004|22D9|2D95|1EBF|1BBB|2B4C|19D2|17EF|0FCE|2AE5|29A9|2A45|1F3A|0502)'
 function Show-UsbCheck {
-  Title 'Проверка кабеля: что видит компьютер'
+  Title (L 'm045')
   if (-not $IsWin) {
-    Say '  На Mac драйверы не нужны. Если телефона нет в списке: другой кабель (с передачей данных), порт прямо в Mac без хаба,'
-    Say '  на телефоне в шторке «USB» -> «Передача файлов», разблокировать экран и принять «Разрешить отладку по USB?».'
+    Say (L 'm046')
+    Say (L 'm047')
     return
   }
   [void](Show-OtherAdb)
@@ -341,11 +559,11 @@ function Show-UsbCheck {
     $devs = @(Get-PnpDevice -PresentOnly -ErrorAction Stop | Where-Object {
       $_.InstanceId -match $PhoneVids -or $_.Class -eq 'AndroidUsbDeviceClass' -or $_.FriendlyName -match 'ADB|Android'
     })
-  } catch { Warn ('Не удалось прочитать список устройств Windows: ' + $_.Exception.Message); return }
+  } catch { Warn ((L 'm048') + $_.Exception.Message); return }
   if ($devs.Count -eq 0) {
-    Warn 'Windows вообще не видит телефон по USB.'
-    Say '  Причины: кабель только для зарядки (самая частая), порт/хаб, или на телефоне режим «Только зарядка».'
-    Say '  Сделать: родной кабель или другой с передачей данных, порт прямо в ноутбуке; в шторке телефона «USB» -> «Передача файлов».'
+    Warn (L 'm049')
+    Say (L 'm050')
+    Say (L 'm051')
     return
   }
   foreach ($d in $devs) { Say ("  {0}  [{1}]  {2}" -f $d.FriendlyName, $d.Status, $d.Class) }
@@ -356,45 +574,45 @@ function Show-UsbCheck {
   $bad = @($devs | Where-Object { $_.Status -ne 'OK' -and $_.Class -ne 'WPD' })
   $drv = Join-Path $Root 'tools/usb_driver'
   if ($adbOk.Count) {
-    Ok 'Драйвер adb стоит (Android ADB Interface).'
-    Say '  Значит телефон ждёт разрешения: разблокируй экран и нажми «Разрешить» в окне «Разрешить отладку по USB?» (галочка «Всегда»).'
-    Say '  Окна нет: «Для разработчиков» -> «Отозвать авторизацию отладки по USB», вынуть и вставить кабель. Потом R.'
+    Ok (L 'm052')
+    Say (L 'm053')
+    Say (L 'm054')
   } elseif ($adbGeneric.Count -or $bad.Count) {
-    if ($adbGeneric.Count) { Warn 'ADB Interface есть, но с общим драйвером Windows (WinUSB) — adb такой интерфейс не видит. Нужен драйвер Google.' }
-    else { Warn 'Есть устройство телефона без драйвера (в Диспетчере устройств с жёлтым знаком).' }
-    Say '  Диспетчер устройств -> «ADB Interface» (раздел «Устройства USB» или «Другие устройства») -> правой кнопкой «Обновить драйвер» ->'
-    Say '  «Найти драйверы на этом компьютере» -> «Выбрать драйвер из списка доступных» -> «Установить с диска» -> «Обзор» ->'
-    Say '  папка tools\usb_driver набора, файл android_winusb.inf -> «Android ADB Interface» -> Далее -> «Да» на предупреждение.'
-    Say '  Потом вынуть и вставить кабель, разблокировать телефон, «Разрешить», и R.'
+    if ($adbGeneric.Count) { Warn (L 'm055') }
+    else { Warn (L 'm056') }
+    Say (L 'm057')
+    Say (L 'm058')
+    Say (L 'm059')
+    Say (L 'm060')
     if (-not (Test-Path (Join-Path $drv 'android_winusb.inf'))) {
-      Warn 'В наборе нет tools\usb_driver. Скачай драйвер: https://dl.google.com/android/repository/usb_driver_r13-windows.zip (распаковать), или запусти prepare.bat у себя.'
-      Say '  Без драйвера можно по Wi-Fi (W) — там драйвер не нужен.'
+      Warn (L 'm061')
+      Say (L 'm062')
     }
     try { Start-Process devmgmt.msc } catch {}
   } else {
-    Warn 'Телефон виден (как накопитель или зарядка), но ADB-интерфейса нет.'
-    Say '  На телефоне: шторка -> уведомление USB -> «Передача файлов»;'
-    Say '  «Для разработчиков» -> выключить и снова включить «Отладку по USB» (на Xiaomi она иногда сама выключается);'
-    Say '  вынуть и вставить кабель, разблокировать экран, принять запрос. Потом R.'
+    Warn (L 'm063')
+    Say (L 'm064')
+    Say (L 'm065')
+    Say (L 'm066')
   }
 }
 
 function Show-EnableHelp {
   Say ''
-  Say 'Как включить отладку на телефоне:' 'White'
-  Say '  1. Режим разработчика — 7 раз нажать на номер сборки:'
-  Say '     Samsung:  Настройки -> Сведения о телефоне -> Сведения о ПО -> «Номер сборки», ввести PIN'
-  Say '     Xiaomi / Redmi / Poco:  Настройки -> О телефоне -> «Версия MIUI» или «Версия ОС» (HyperOS)'
-  Say '     Realme / OPPO / OnePlus:  Настройки -> Об устройстве -> Версия -> «Номер сборки»'
-  Say '     Honor / Huawei:  Настройки -> О телефоне -> «Номер сборки»'
-  Say '     Pixel / Motorola / Nokia и др.:  Настройки -> О телефоне -> «Номер сборки»'
-  Say '  2. Включить «Отладка по USB» в «Параметры разработчика» / «Для разработчиков»'
-  Say '     (Samsung — в самом низу настроек; Xiaomi — «Расширенные настройки»; Realme/OPPO — «Дополнительные настройки»; Huawei/Honor — «Система»).'
-  Say '  3. Samsung One UI 6+: временно выключить «Автоблокировщик» (Безопасность и конфиденциальность), в конце включить обратно.'
-  Say '     Huawei/Honor: включить ещё «Разрешить отладку ADB в режиме "Только зарядка"».'
-  Say '  КАБЕЛЬ: кабель с передачей данных; в уведомлении USB выбрать «Передача файлов»; разрешить отладку на экране.'
-  Say '     Если на Windows телефон не виден (часто Samsung без драйвера) — проще подключить по Wi-Fi (пункт W).'
-  Say '  WI-FI (Android 11+): «Беспроводная отладка» -> включить -> «Подключить устройство по коду». Телефон и компьютер в одной сети.'
+  Say (L 'm067') 'White'
+  Say (L 'm068')
+  Say (L 'm069')
+  Say (L 'm070')
+  Say (L 'm071')
+  Say (L 'm072')
+  Say (L 'm073')
+  Say (L 'm074')
+  Say (L 'm075')
+  Say (L 'm076')
+  Say (L 'm077')
+  Say (L 'm078')
+  Say (L 'm079')
+  Say (L 'm080')
 }
 
 function Get-Model([string]$serial) {
@@ -405,43 +623,43 @@ function Get-Model([string]$serial) {
 
 function Pair-Wifi {
   Say ''
-  Say 'На телефоне: Параметры разработчика -> «Беспроводная отладка» -> включить -> «Подключить устройство по коду».' 'White'
-  Say 'Окно с кодом НЕ закрывать до конца сопряжения.' 'White'
+  Say (L 'm081') 'White'
+  Say (L 'm082') 'White'
   $before = @(Get-AdbDevices | ForEach-Object { $_.Serial })
   $pt = ''
-  Say '  ищу окно сопряжения в сети (несколько секунд)...'
+  Say (L 'm083')
   $found = @()
   for ($i = 0; $i -lt 3 -and $found.Count -eq 0; $i++) { $found = @(Get-Mdns | Where-Object { $_.Kind -eq 'pairing' }); if (-not $found.Count) { Start-Sleep -Seconds 2 } }
-  if ($found.Count -eq 1) { $pt = $found[0].Addr; Ok "нашёл окно сопряжения: $pt" }
+  if ($found.Count -eq 1) { $pt = $found[0].Addr; Ok (L 'm084' $pt) }
   elseif ($found.Count -gt 1) {
     for ($i = 0; $i -lt $found.Count; $i++) { Say ("  {0}) {1}" -f ($i + 1), $found[$i].Addr) 'White' }
-    $a = ([string](Read-Host 'Какой адрес совпадает с окном на телефоне (номер)')).Trim()
+    $a = Ask (L 'm085') 'menu' @(for ($i = 0; $i -lt $found.Count; $i++) { Opt ([string]($i + 1)) $found[$i].Addr })
     if ($a -match '^\d+$' -and [int]$a -ge 1 -and [int]$a -le $found.Count) { $pt = $found[[int]$a - 1].Addr }
   }
   if (-not $pt) {
-    Say '  Автоматически не нашёл (бывает: брандмауэр, Mac «Локальная сеть», разные сети).'
-    Say '  Нужен IP:порт из ВСПЛЫВАЮЩЕГО окна с кодом (под шестью цифрами), а не с экрана «Беспроводная отладка» — там порт другой.' 'Yellow'
-    $pt = Read-Addr 'IP:порт из окна с кодом (например 192.168.1.50:37123), Enter — отмена'
+    Say (L 'm086')
+    Say (L 'm087') 'Yellow'
+    $pt = Read-Addr (L 'm088')
     if (-not $pt) { return $null }
   }
-  do { $code = ([string](Read-Host 'Код из 6 цифр с экрана телефона')).Trim() } until ($code -match '^\d{6}$')
+  do { $code = Ask (L 'm089') 'code6' $null @{ addr = $pt } } until ($code -match '^\d{6}$')
   $r = Invoke-Adb @('pair', $pt, $code) 30
   $txt = ($r.Out + ' ' + $r.Err).Trim()
   if ($txt -notmatch 'Successfully paired') {
-    Warn "Сопряжение не прошло: $txt"
+    Warn (L 'm090' $txt)
     if ($txt -match 'protocol fault|couldn.t read status') {
-      Say '  Почти всегда это одно из двух:' 'Yellow'
-      Say '   1) введён порт с главного экрана «Беспроводная отладка», а нужен порт из окна с кодом;' 'Yellow'
-      Say '   2) окно с кодом уже закрылось (погас экран, переключились на другое приложение, прошло больше минуты).' 'Yellow'
-    } elseif ($txt -match 'Wrong password') { Say '  Неверный код — коды одноразовые, у каждого окна свой.' 'Yellow' }
-    elseif ($txt -match 'failed to connect|refused|timed out|No route') { Say '  Компьютер не достучался до телефона: разные сети, гостевой Wi-Fi или VPN на телефоне. Проще кабелем.' 'Yellow' }
-    Say '  Открой «Подключить устройство по коду» снова (новый код и порт), экран телефона не гасить, и сразу W.'
-    Say '  Не выходит со второго раза — подключи кабелем: это надёжнее всего.'
+      Say (L 'm091') 'Yellow'
+      Say (L 'm092') 'Yellow'
+      Say (L 'm093') 'Yellow'
+    } elseif ($txt -match 'Wrong password') { Say (L 'm094') 'Yellow' }
+    elseif ($txt -match 'failed to connect|refused|timed out|No route') { Say (L 'm095') 'Yellow' }
+    Say (L 'm096')
+    Say (L 'm097')
     return $null
   }
-  Ok 'Сопряжение прошло'
+  Ok (L 'm098')
   $ip = ($pt -split ':')[0]
-  Say '  жду подключения (до 15 секунд)...'
+  Say (L 'm099')
   for ($i = 0; $i -lt 8; $i++) {
     Start-Sleep -Seconds 2
     foreach ($d in (Get-AdbDevices)) {
@@ -451,8 +669,8 @@ function Pair-Wifi {
       $s = Connect-Addr $m.Addr; if ($s) { return $s }
     }
   }
-  Say '  Сам не подключился. На главном экране «Беспроводной отладки» есть «IP-адрес и порт» (порт другой, чем в окне с кодом).'
-  $ct = Read-Addr 'IP:порт с главного экрана «Беспроводной отладки», Enter — отмена'
+  Say (L 'm100')
+  $ct = Read-Addr (L 'm101')
   if ($ct) { return (Connect-Addr $ct) }
   return $null
 }
@@ -464,31 +682,36 @@ function Select-Phone {
     $devs = @(Get-AdbDevices)
     $ready = @($devs | Where-Object { $_.State -eq 'device' })
     if ($first -and $ready.Count -eq 1) {
-      Ok ("Найден телефон: {0}  ({1})" -f (Get-Model $ready[0].Serial), $ready[0].Serial)
+      Ok ((L 'm102') -f (Get-Model $ready[0].Serial), $ready[0].Serial)
       return $ready[0].Serial
     }
     $first = $false
     Say ''
-    if ($devs.Count -eq 0) { Warn 'Телефон не виден. Подключи кабелем (и разреши отладку на экране) или по Wi-Fi — пункт W. Кабель есть, а телефона нет — пункт U.' }
+    if ($devs.Count -eq 0) { Warn (L 'm103') }
     for ($i = 0; $i -lt $devs.Count; $i++) {
       $d = $devs[$i]
       $lbl = $d.Serial
       if ($d.State -eq 'device') { $lbl = (Get-Model $d.Serial) + "  ($($d.Serial))" }
-      elseif ($d.State -eq 'unauthorized') { $lbl += '  (ждёт разрешения на экране телефона)' }
-      elseif ($d.State -eq 'offline') { $lbl += '  (offline — выбери номер: набор подождёт и подскажет, что делать)' }
+      elseif ($d.State -eq 'unauthorized') { $lbl += (L 'm104') }
+      elseif ($d.State -eq 'offline') { $lbl += (L 'm105') }
       else { $lbl += "  ($($d.State))" }
       Say ("  {0}) {1}" -f ($i + 1), $lbl) 'White'
     }
-    Say '  W) подключить по Wi-Fi кодом (Android 11+, без драйверов)' 'White'
-    Say '  I) ввести IP:порт вручную' 'White'
-    Say '  H) как включить отладку на телефоне' 'White'
-    Say '  U) кабель подключён, а телефона нет — проверить, что видит компьютер' 'White'
-    Say '  R) обновить список (после подключения кабеля / разрешения на экране)      Q) выход' 'White'
-    $a = ([string](Read-Host 'Ваш выбор')).Trim()
+    Say (L 'm106') 'White'
+    Say (L 'm107') 'White'
+    Say (L 'm108') 'White'
+    Say (L 'm109') 'White'
+    Say (L 'm110') 'White'
+    $opts = @()
+    for ($i = 0; $i -lt $devs.Count; $i++) { $d = $devs[$i]; $opts += (Opt ([string]($i + 1)) $(if ($d.State -eq 'device') { (Get-Model $d.Serial) + "  ($($d.Serial))" } else { "$($d.Serial)  ($($d.State))" })) }
+    $opts += (Opt 'W' ((L 'm106') -replace '^\s*\w\)\s*', '')); $opts += (Opt 'I' ((L 'm107') -replace '^\s*\w\)\s*', ''))
+    $opts += (Opt 'H' ((L 'm108') -replace '^\s*\w\)\s*', '')); $opts += (Opt 'U' ((L 'm109') -replace '^\s*\w\)\s*', ''))
+    $opts += (Opt 'R' (L 'w020')); $opts += (Opt 'Q' (L 'w021'))
+    $a = Ask (L 'm111') 'menu' $opts @{ screen = 'connect'; devices = $devs.Count }
     if ($a -match '^\d+$' -and [int]$a -ge 1 -and [int]$a -le $devs.Count) { return $devs[[int]$a - 1].Serial }
     elseif ($a -match '^[WwЦц]$') { $s = Pair-Wifi; if ($s) { return $s } }
     elseif ($a -match '^[IiШш]$') {
-      $t = Read-Addr 'IP:порт (например 192.168.1.50:41235)'
+      $t = Read-Addr (L 'm112')
       if ($t) { $s = Connect-Addr $t; if ($s) { return $s } }
     }
     elseif ($a -match '^[HhРр]$') { Show-EnableHelp }
@@ -533,7 +756,7 @@ function Parse-Duration([string]$s) {
 }
 function Fmt-Dur([int64]$sec) {
   $h = [math]::Floor($sec / 3600); $m = [math]::Floor(($sec % 3600) / 60)
-  if ($h -gt 0) { return "$h ч $m мин" } return "$m мин"
+  if ($h -gt 0) { return (L 'm113' $h $m) } return (L 'm114' $m)
 }
 
 function Parse-Usage([string]$txt) {
@@ -572,8 +795,8 @@ function Parse-Roles([string]$txt) {
 
 function Redact([string]$t) {
   $t = [regex]::Replace($t, '(?i)\b([0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b', 'xx:xx:xx:xx:xx:xx')
-  $t = [regex]::Replace($t, '(?m)^(\[[^\]]*(serial|imei|meid|iccid|msisdn|cpuid|wifimac|btmac|ethmac|macaddr|phone_number|\.sn)[^\]]*\]: )\[.*\]', '$1[скрыто]')
-  $t = [regex]::Replace($t, '\b\d{15}\b', '[скрыто]')
+  $t = [regex]::Replace($t, '(?m)^(\[[^\]]*(serial|imei|meid|iccid|msisdn|cpuid|wifimac|btmac|ethmac|macaddr|phone_number|\.sn)[^\]]*\]: )\[.*\]', (L 'm115'))
+  $t = [regex]::Replace($t, '\b\d{15}\b', (L 'm116'))
   return $t
 }
 
@@ -669,7 +892,7 @@ function Log-Change([string]$t) {
   [IO.File]::AppendAllText($script:ChangeLog, ((Get-Date -Format 'HH:mm:ss') + ' ' + $t + "`r`n"), (New-Object Text.UTF8Encoding($false)))
 }
 function ShW([string]$cmd, [int]$TimeoutSec = 120) {
-  if (-not (Test-WriteAllowed $cmd)) { throw "Команда записи не из белого списка, не отправлена: $cmd" }
+  if (-not (Test-WriteAllowed $cmd)) { throw (L 'm117' $cmd) }
   $r = Invoke-Adb @('-s', $script:Serial, 'shell', $cmd) $TimeoutSec
   $out = (($r.Out + ' ' + $r.Err) -replace "`r", '').Trim()
   if ($r.TimedOut) { $out = 'TIMEOUT ' + $out }
@@ -680,9 +903,11 @@ function OptLog([string]$t, [string]$kind = 'info') {
   [void]$script:OptLines.Add($t)
   switch ($kind) { 'ok' { Ok $t } 'warn' { Warn $t } 'bad' { Bad $t } default { Say ('  ' + $t) } }
 }
-function Confirm-Yes([string]$q) {
-  $a = ([string](Read-Host $q)).Trim().ToLower()
-  return ($a -in @('да', 'д', 'lf', 'l', 'y', 'yes'))
+function Confirm-Yes([string]$q, [string]$webQ = '') {
+  if ($script:WebUi -and $webQ) { $q = $webQ }
+  $a = (Ask $q 'confirm').ToLower()
+  # «да» на всех языках набора (и в английской раскладке): ru/uk/en/pt/es/fr/it/de/lv/pl
+  return ($a -in @('да', 'д', 'lf', 'l', 'так', 'т', 'y', 'yes', 'sim', 's', 'sí', 'sì', 'si', 'oui', 'o', 'ja', 'j', 'jā', 'tak', 't'))
 }
 
 function Get-DisabledSet { return ,(Parse-PkgList (Sh 'pm list packages -d')) }
@@ -709,11 +934,11 @@ function Get-Health {
 }
 function Compare-Health($base, $now) {
   $p = @()
-  if (-not $now.Model) { $p += 'телефон не отвечает' }
-  if ($now.HomeBad -and -not $base.HomeBad) { $p += "сломался рабочий стол ($($now.Home))" }
-  if ($base.Settings -and -not $now.Settings) { $p += 'не находятся Настройки' }
-  if ($base.Ime -and -not $now.Ime) { $p += 'отключилась клавиатура' }
-  if ($base.SysUi -and -not $now.SysUi) { $p += 'не работает системный интерфейс (SystemUI)' }
+  if (-not $now.Model) { $p += (L 'm118') }
+  if ($now.HomeBad -and -not $base.HomeBad) { $p += (L 'm119' $($now.Home)) }
+  if ($base.Settings -and -not $now.Settings) { $p += (L 'm120') }
+  if ($base.Ime -and -not $now.Ime) { $p += (L 'm121') }
+  if ($base.SysUi -and -not $now.SysUi) { $p += (L 'm122') }
   return ,$p
 }
 
@@ -727,40 +952,40 @@ function Add-Journal($entry) { [void]$script:Journal.Add($entry); Save-State }
 
 function Disable-Pkg([string]$pkg, [switch]$Third) {
   # Последняя проверка безопасности прямо перед командой
-  if ($script:keepSet.Contains($pkg)) { OptLog "пропуск $pkg — приложение по умолчанию / спецвозможности / администратор" 'warn'; return $false }
+  if ($script:keepSet.Contains($pkg)) { OptLog (L 'm123' $pkg) 'warn'; return $false }
   if (-not $Third) {
-    if (Test-Protected $pkg) { OptLog "пропуск $pkg — защищён" 'warn'; return $false }
-    if ($script:third.Contains($pkg)) { OptLog "пропуск $pkg — приложение пользователя" 'warn'; return $false }
-    if ($script:usedPkgs.Contains($pkg)) { OptLog "пропуск $pkg — им пользовались" 'warn'; return $false }
+    if (Test-Protected $pkg) { OptLog (L 'm124' $pkg) 'warn'; return $false }
+    if ($script:third.Contains($pkg)) { OptLog (L 'm125' $pkg) 'warn'; return $false }
+    if ($script:usedPkgs.Contains($pkg)) { OptLog (L 'm126' $pkg) 'warn'; return $false }
   }
   $out = ShW "pm disable-user --user 0 $pkg"
   $listed = (Get-DisabledSet).Contains($pkg)
   $said = ($out -match 'new state: disabled')
   # Журналим всегда, когда телефон подтвердил команду: иначе откат не узнает про это изменение
   if ($listed -or $said) { Add-Journal @{ t = 'disable'; pkg = $pkg } }
-  if ($listed) { OptLog "отключён $pkg" 'ok'; return $true }
-  if ($said) { OptLog "${pkg}: телефон ответил «отключён», но в списке отключённых его нет — записан в журнал" 'warn'; return $true }
-  if ($Third) { OptLog "не отключился $pkg ($out) — удалить обычным способом в Настройках" 'warn'; return $false }
+  if ($listed) { OptLog (L 'm127' $pkg) 'ok'; return $true }
+  if ($said) { OptLog (L 'm128' ${pkg}) 'warn'; return $true }
+  if ($Third) { OptLog (L 'm129' $pkg $out) 'warn'; return $false }
   # Прошивка не дала отключить (бывает на Xiaomi/Samsung) — удаляем только для пользователя 0, с сохранением; откат: install-existing
   $out2 = ShW "pm uninstall -k --user 0 $pkg"
   $gone = -not (Get-InstalledSet).Contains($pkg)
   if ($out2 -match 'Success' -or $gone) {
     Add-Journal @{ t = 'uninstall'; pkg = $pkg }
-    if ($gone) { OptLog "убран для пользователя $pkg (отключить прошивка не дала; вернуть можно откатом)" 'ok'; return $true }
-    OptLog "${pkg}: телефон ответил Success, но пакет ещё в списке — записан в журнал" 'warn'; return $true
+    if ($gone) { OptLog (L 'm130' $pkg) 'ok'; return $true }
+    OptLog (L 'm131' ${pkg}) 'warn'; return $true
   }
-  OptLog "не отключился $pkg ($out / $out2) — это нормально, прошивка защищает пакет" 'warn'; return $false
+  OptLog (L 'm132' $pkg $out $out2) 'warn'; return $false
 }
 function Enable-Pkg([string]$pkg) {
   $out = ShW "pm enable --user 0 $pkg"
-  if (-not (Get-DisabledSet).Contains($pkg)) { OptLog "включён обратно $pkg" 'ok'; return $true }
-  OptLog "не включился $pkg ($out)" 'bad'; return $false
+  if (-not (Get-DisabledSet).Contains($pkg)) { OptLog (L 'm133' $pkg) 'ok'; return $true }
+  OptLog (L 'm134' $pkg $out) 'bad'; return $false
 }
 function Restore-Pkg([string]$pkg) {
   $out = ShW "cmd package install-existing --user 0 $pkg"
   if (-not (Get-InstalledSet).Contains($pkg)) { $out += ' / ' + (ShW "pm install-existing --user 0 $pkg") }
-  if ((Get-InstalledSet).Contains($pkg)) { OptLog "возвращён $pkg" 'ok'; return $true }
-  OptLog "не вернулся $pkg ($out)" 'bad'; return $false
+  if ((Get-InstalledSet).Contains($pkg)) { OptLog (L 'm135' $pkg) 'ok'; return $true }
+  OptLog (L 'm136' $pkg $out) 'bad'; return $false
 }
 function Set-GlobalSetting([string]$key, [string]$val) {
   $old = (Sh "settings get global $key").Trim()
@@ -770,7 +995,7 @@ function Set-GlobalSetting([string]$key, [string]$val) {
 }
 function Set-Anim([string]$val) {
   foreach ($k in $AnimKeys) { Set-GlobalSetting $k $val }
-  OptLog "анимации -> $val" 'ok'
+  OptLog (L 'm137' $val) 'ok'
 }
 function Test-NetBroken {
   $c = Sh 'dumpsys connectivity'
@@ -780,14 +1005,14 @@ function Set-Dns([string]$host_) {
   $start = $script:Journal.Count
   Set-GlobalSetting 'private_dns_specifier' $host_
   Set-GlobalSetting 'private_dns_mode' 'hostname'
-  Say '  проверяю, что интернет работает с новым DNS (15 с)...'
+  Say (L 'm138')
   Start-Sleep -Seconds 15
   if (Test-NetBroken) {
-    OptLog "частный DNS $host_ не работает в этой сети — возвращаю как было" 'bad'
+    OptLog (L 'm139' $host_) 'bad'
     Undo-Journal $start
     return $false
   }
-  OptLog "частный DNS -> $host_ (реклама и трекеры режутся на уровне DNS)" 'ok'
+  OptLog (L 'm140' $host_) 'ok'
   return $true
 }
 function Get-BgMode([string]$pkg) {
@@ -796,15 +1021,15 @@ function Get-BgMode([string]$pkg) {
   return 'default'
 }
 function Restrict-Bg([string]$pkg) {
-  if ($script:keepSet.Contains($pkg)) { OptLog "пропуск $pkg — приложение по умолчанию / спецвозможности" 'warn'; return $false }
+  if ($script:keepSet.Contains($pkg)) { OptLog (L 'm141' $pkg) 'warn'; return $false }
   $old = Get-BgMode $pkg
-  if ($old -eq 'ignore') { OptLog "${pkg}: фон уже ограничен" 'ok'; return $false }
+  if ($old -eq 'ignore') { OptLog (L 'm142' ${pkg}) 'ok'; return $false }
   [void](ShW "cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore")
   if ((Get-BgMode $pkg) -eq 'ignore') {
     Add-Journal @{ t = 'appops'; pkg = $pkg; old = $old }
-    OptLog "фон запрещён: $pkg" 'ok'; return $true
+    OptLog (L 'm143' $pkg) 'ok'; return $true
   }
-  OptLog "фон не ограничился: $pkg" 'warn'; return $false
+  OptLog (L 'm144' $pkg) 'warn'; return $false
 }
 function Clear-Caches {
   $f1 = Get-DataFree
@@ -812,7 +1037,7 @@ function Clear-Caches {
   Start-Sleep -Seconds 3
   $f2 = Get-DataFree
   $d = [math]::Max(0, (Mb ($f2 - $f1)))
-  OptLog "кэш приложений очищен, освободилось ~$d МБ (свободно стало $(Mb $f2) МБ)" 'ok'
+  OptLog (L 'm145' $d $(Mb $f2)) 'ok'
 }
 function Get-DataFree {
   foreach ($l in ((Sh 'df -k /data') -split "`n")) { if ($l -match '^\S+\s+\d+\s+\d+\s+(\d+)\s+\d+%') { return [int64]$Matches[1] } }
@@ -826,13 +1051,13 @@ function Undo-Entry($e) {
     'setting' {
       $old = [string]$e.old
       if (-not $old -or $old -eq 'null') { [void](ShW "settings delete global $($e.key)") } else { [void](ShW "settings put global $($e.key) $old") }
-      OptLog "настройка $($e.key) -> $(if ($old -and $old -ne 'null') { $old } else { 'по умолчанию' })" 'ok'
+      OptLog (L 'm147' $($e.key) $(if ($old -and $old -ne 'null') { $old } else { (L 'm146') })) 'ok'
     }
     'appops' {
       $old = [string]$e.old
       if ($old -notin @('allow', 'ignore', 'default')) { $old = 'default' }
       [void](ShW "cmd appops set $($e.pkg) RUN_ANY_IN_BACKGROUND $old")
-      OptLog "фон снова разрешён: $($e.pkg)" 'ok'
+      OptLog (L 'm148' $($e.pkg)) 'ok'
     }
   }
 }
@@ -854,20 +1079,20 @@ function Find-SameDevice([string]$sn) {
 function Invoke-RebootCheck {
   $sn = (Sh 'getprop ro.serialno').Trim()
   $wifi = ($script:Serial -match ':\d+$' -or $script:Serial -match '_adb-tls-connect')
-  OptLog 'перезагрузка телефона для проверки'
-  Say '  Сохраняю изменения перед перезагрузкой (20 секунд)...'
+  OptLog (L 'm149')
+  Say (L 'm150')
   Start-Sleep -Seconds 20
   $o = ShW 'svc power reboot' 20
   if ($o -match 'Unknown|not found|Error') { [void](ShW 'reboot' 20) }
-  Say '  Телефон перезагружается, жду до 5 минут...'
-  if ($wifi) { Say '  По Wi-Fi: после загрузки разблокируй телефон и включи «Беспроводную отладку» снова (Xiaomi и многие другие её выключают).' 'Yellow' }
-  else { Say '  После загрузки разблокируй телефон (если спросит PIN).' 'Yellow' }
+  Say (L 'm151')
+  if ($wifi) { Say (L 'm152') 'Yellow' }
+  else { Say (L 'm153') 'Yellow' }
   Start-Sleep -Seconds 30
   $up = $false; $seen = $false; $hinted = $false; $tried = @{}; $ext = 0
   $tries = $(if ($wifi) { 45 } else { 27 })   # по Wi-Fi нужен человек: включить отладку и, возможно, ввести код
   for ($i = 0; $i -lt $tries; $i++) {
     if ($wifi -and -not $seen -and $i -eq $tries - 1) {
-      $more = ([string](Read-Host '  Телефон по Wi-Fi ещё не подключился. Подождать ещё? (Enter — ждать дальше, Q — закончить)')).Trim()
+      $more = Ask (L 'm154') 'menu' @((Opt '' (L 'w022')), (Opt 'Q' (L 'w023')))
       if ($more -notmatch '^[QqЙй]$' -and $ext -lt 6) { $ext++; $tries += 30 }
     }
     $ms = @()
@@ -885,21 +1110,21 @@ function Invoke-RebootCheck {
       if (-not $hinted -and $i -ge 3) {
         $hinted = $true
         Say ''
-        Say '  Телефон по Wi-Fi пока не виден — после перезагрузки «Беспроводная отладка» выключилась. Это нормально:' 'Yellow'
-        Say '   1) разблокируй телефон -> Параметры разработчика -> снова включи «Беспроводная отладка»;' 'Yellow'
-        Say '   2) не подключился за 20 секунд — нажми «Подключить устройство по коду»: набор сам найдёт окно и спросит 6 цифр.' 'Yellow'
-        Say '   Удалять компьютер из списка сопряжённых НЕ нужно. Набор ждёт 7 минут, потом спросит, ждать ли ещё.' 'Yellow'
+        Say (L 'm155') 'Yellow'
+        Say (L 'm156') 'Yellow'
+        Say (L 'm157') 'Yellow'
+        Say (L 'm158') 'Yellow'
       }
       $pw = @($ms | Where-Object { $_.Kind -eq 'pairing' -and -not $tried.ContainsKey($_.Addr) }) | Select-Object -First 1
       if ($pw) {
         $tried[$pw.Addr] = 1
-        Ok "вижу окно сопряжения на телефоне: $($pw.Addr)"
-        $code = ([string](Read-Host '  Код из 6 цифр с экрана телефона (Enter — пропустить)')).Trim()
+        Ok (L 'm159' $($pw.Addr))
+        $code = Ask (L 'm160') 'code6' $null @{ addr = $pw.Addr; skip = $true }
         if ($code -match '^\d{6}$') {
           $r = Invoke-Adb @('pair', $pw.Addr, $code) 30
           $txt = ($r.Out + ' ' + $r.Err).Trim()
-          if ($txt -match 'Successfully paired') { Ok 'Сопряжение прошло, подключаюсь...' }
-          else { Warn "Сопряжение не прошло: $txt — открой «Подключить устройство по коду» ещё раз (новый код)." }
+          if ($txt -match 'Successfully paired') { Ok (L 'm161') }
+          else { Warn (L 'm162' $txt) }
         }
         continue
       }
@@ -908,14 +1133,14 @@ function Invoke-RebootCheck {
   }
   if (-not $up) {
     if ($seen) {
-      OptLog 'телефон виден по ADB, но за 5 минут не догрузился — похоже на зацикливание загрузки' 'bad'
-      if (Confirm-Yes 'Попробовать откатить ВСЁ сделанное прямо сейчас? (да / Enter — нет)') { Undo-Journal 0 }
-      Say '  Если не поможет: подождать 10 минут, принудительная перезагрузка (питание + громкость вниз 10-15 с), потом снова пункт 3 «Откат». Сброс к заводским НЕ делать.' 'Yellow'
+      OptLog (L 'm163') 'bad'
+      if (Confirm-Yes (L 'm164') (L 'w011')) { Undo-Journal 0 }
+      Say (L 'm165') 'Yellow'
     } else {
       if ($wifi) {
-        OptLog 'телефон не вернулся по Wi-Fi за 7 минут. Обычно это нормально: после перезагрузки Xiaomi и многие другие сами выключают «Беспроводную отладку». Если телефон загрузился и работает — изменения сохранены. Проверить: включи «Беспроводную отладку», запусти набор, пункт 1 — отключённое будет в «Уже отключены».' 'warn'
+        OptLog (L 'm166') 'warn'
       } else {
-        OptLog 'телефон не вернулся в ADB за 5 минут. Проверь экран телефона: если загрузился — включи отладку снова, запусти набор и сделай диагностику (пункт 1) или откат (пункт 3).' 'warn'
+        OptLog (L 'm167') 'warn'
       }
     }
     return
@@ -927,43 +1152,44 @@ function Invoke-RebootCheck {
     if ($e.t -eq 'disable' -and -not $dis.Contains([string]$e.pkg)) { $back += [string]$e.pkg }
     if ($e.t -eq 'uninstall' -and $inst.Contains([string]$e.pkg)) { $back += [string]$e.pkg }
   }
-  if ($back.Count) { OptLog ('прошивка вернула после перезагрузки: ' + ($back -join ', ')) 'warn' }
-  else { OptLog 'после перезагрузки всё отключённое осталось отключённым' 'ok' }
+  if ($back.Count) { OptLog ((L 'm168') + ($back -join ', ')) 'warn' }
+  else { OptLog (L 'm169') 'ok' }
   $h = Get-Health
-  if ($h.HomeBad) { OptLog "внимание: рабочий стол после перезагрузки: $($h.Home)" 'bad' } else { OptLog ('рабочий стол после перезагрузки: ' + $h.Home) 'ok' }
-  if (-not $h.SysUi) { OptLog 'внимание: SystemUI не запущен' 'bad' }
+  if ($h.HomeBad) { OptLog (L 'm170' $($h.Home)) 'bad' } else { OptLog ((L 'm171') + $h.Home) 'ok' }
+  if (-not $h.SysUi) { OptLog (L 'm172') 'bad' }
 }
 
 function Invoke-Optimization {
-  Title 'Оптимизация: план'
+  Emit 'stage' @{ s = 'plan' }
+  Title (L 'm173')
   $items = New-Object System.Collections.ArrayList
-  function AddItem($kind, $pkg, $text, $on, $group) { [void]$items.Add([pscustomobject]@{ Kind = $kind; Pkg = $pkg; Text = $text; On = [bool]$on; Group = $group }) }
+  function AddItem($kind, $pkg, $text, $on, $group, $tier = '') { [void]$items.Add([pscustomobject]@{ Kind = $kind; Pkg = $pkg; Text = $text; On = [bool]$on; Group = $group; Tier = $tier }) }
 
-  $animNow = $set['Анимация окон']
-  if ($animNow -notin @('0.5', '0.5f', '0', '0.0')) { AddItem 'anim' '' "Анимации интерфейса -> 0.5x (сейчас $(if ($animNow -and $animNow -ne 'null') { $animNow } else { '1x' }))" $true 'Настройки' }
-  if ($set['Частный DNS (режим)'] -ne 'hostname') {
-    if ($kids) { AddItem 'dns' 'family.adguard-dns.com' 'Частный DNS AdGuard «Семейный»: режет рекламу и взрослые сайты (family.adguard-dns.com) — по желанию родителей' $false 'Настройки' }
-    else { AddItem 'dns' 'dns.adguard-dns.com' 'Частный DNS AdGuard: режет рекламу в приложениях и браузере, на сайтах с фильмами — большую часть (dns.adguard-dns.com) — по желанию клиента' $false 'Настройки' }
+  $animNow = $set['anim_w']
+  if ($animNow -notin @('0.5', '0.5f', '0', '0.0')) { AddItem 'anim' '' (L 'm174' $(if ($animNow -and $animNow -ne 'null') { $animNow } else { '1x' })) $true (L 'm175') }
+  if ($set['dns_mode'] -ne 'hostname') {
+    if ($kids) { AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175') }
+    else { AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false (L 'm175') }
   }
-  $cacheTxt = 'Очистить кэш всех приложений'
-  if ($cacheMb -gt 0) { $cacheTxt += " (~$cacheMb МБ)" }
-  $cacheTxt += ' — необратимо, но безопасно: данные и вход в приложения не трогает'
-  AddItem 'cache' '' $cacheTxt ($dataPct -ge 85) 'Настройки'
+  $cacheTxt = (L 'm178')
+  if ($cacheMb -gt 0) { $cacheTxt += (L 'm179' $cacheMb) }
+  $cacheTxt += (L 'm180')
+  AddItem 'cache' '' $cacheTxt ($dataPct -ge 85) (L 'm175')
 
-  foreach ($s in $suspOk) { AddItem 'third' $s.Pkg ("Отключить подозрительное приложение $($s.Pkg) — $($s.Why)  (спросить владельца; потом удалить обычным способом)") $false 'Безопасность' }
+  foreach ($s in $suspOk) { AddItem 'third' $s.Pkg ((L 'm181' $($s.Pkg) $($s.Why))) $false (L 'm182') }
 
   foreach ($c in $candOk) {
-    $txt = "Отключить $($c.Pkg)"
+    $txt = (L 'm183' $($c.Pkg))
     if ($c.Note) { $txt += " — $($c.Note)" }
-    if ($c.Mb -gt 0) { $txt += " [$($c.Mb) МБ]" }
+    if ($c.Mb -gt 0) { $txt += (L 'm184' $($c.Mb)) }
     if ($c.Ask) { $txt += "  ($($c.Ask))" }
-    if ($c.Tier -eq 'base') { $txt += '  (база: можно, пользы немного — по желанию; B — отметить все такие)' }
-    $grp = @{ 'auto' = 'Лишнее системное: реклама, сбор данных, мусор'; 'base' = 'Лишнее системное: можно, но не обязательно'; 'ask' = 'Функции и приложения: только если владелец не пользуется' }[$c.Tier]
-    AddItem 'disable' $c.Pkg $txt ($c.Tier -eq 'auto') $grp
+    if ($c.Tier -eq 'base') { $txt += (L 'm185') }
+    $grp = @{ 'auto' = (L 'm186'); 'base' = (L 'm187'); 'ask' = (L 'm188') }[$c.Tier]
+    AddItem 'disable' $c.Pkg $txt ($c.Tier -eq 'auto') $grp $c.Tier
   }
-  foreach ($b in $bgCands) { AddItem 'bg' $b.Pkg ("Запретить работу в фоне: $($b.Pkg) — не открывали больше месяца$(if ($b.Mb -gt 0) { ", сейчас занимает $($b.Mb) МБ" })") $true 'Фон' }
+  foreach ($b in $bgCands) { AddItem 'bg' $b.Pkg ((L 'm190' $($b.Pkg) $(if ($b.Mb -gt 0) { (L 'm189' $($b.Mb)) }))) $true (L 'm191') }
 
-  if ($items.Count -eq 0) { OptLog 'Менять нечего.' 'ok'; return }
+  if ($items.Count -eq 0) { OptLog (L 'm192') 'ok'; return }
 
   while ($true) {
     Say ''
@@ -974,15 +1200,22 @@ function Invoke-Optimization {
       if ($it.On) { Say ("  [x] {0,2}. {1}" -f ($i + 1), $it.Text) 'Green' } else { Say ("  [ ] {0,2}. {1}" -f ($i + 1), $it.Text) 'Gray' }
     }
     Say ''
-    Say '[x] — уже выбрано, будет сделано. Чтобы выполнить отмеченное — просто Enter.' 'Green'
-    Say '[ ] — не выбрано, но ДОСТУПНО: введи номер, чтобы включить (например, DNS против рекламы).' 'Gray'
-    Say 'Номер (через пробел, можно 5-12) ПЕРЕКЛЮЧАЕТ галочку: у отмеченного снимает, у пустого ставит.' 'Cyan'
-    Say 'B — отметить все «база: можно»; A — всё; 0 — снять всё; Q — выйти без изменений' 'Cyan'
-    $a = ([string](Read-Host 'Ввод (Enter — выполнить отмеченное)')).Trim()
+    Say (L 'm193') 'Green'
+    Say (L 'm194') 'Gray'
+    Say (L 'm195') 'Cyan'
+    Say (L 'm196') 'Cyan'
+    $pl = @(for ($i = 0; $i -lt $items.Count; $i++) { $it = $items[$i]; [ordered]@{ n = $i + 1; kind = $it.Kind; pkg = $it.Pkg; text = $it.Text; on = [bool]$it.On; group = $it.Group; tier = $it.Tier } })
+    $a = Ask (L 'm197') 'plan' $null @{ items = $pl }
     if ($a -eq '') { break }
-    if ($a -match '^[QqЙй]$') { OptLog 'Выход из оптимизации без изменений.'; return }
+    if ($a.StartsWith('=')) {
+      # страница присылает итоговый выбор: =1,3,7 (или просто =) — и сразу дальше
+      $nums = @($a.Substring(1) -split '[,\s]+' | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
+      for ($i = 0; $i -lt $items.Count; $i++) { $items[$i].On = ($nums -contains ($i + 1)) }
+      break
+    }
+    if ($a -match '^[QqЙй]$') { OptLog (L 'm198'); return }
     if ($a -match '^[AaФф]$') { foreach ($it in $items) { $it.On = $true }; continue }
-    if ($a -match '^[BbИи]$') { foreach ($it in $items) { if ($it.Text -like '*(база: можно*') { $it.On = $true } }; continue }
+    if ($a -match '^[BbИи]$') { foreach ($it in $items) { if ($it.Tier -eq 'base') { $it.On = $true } }; continue }
     if ($a -eq '0') { foreach ($it in $items) { $it.On = $false }; continue }
     $nums = New-Object System.Collections.ArrayList
     foreach ($n in ($a -split '[\s,;]+')) {
@@ -995,19 +1228,19 @@ function Invoke-Optimization {
       $items[$k - 1].On = -not $items[$k - 1].On
       if ($items[$k - 1].On) { $onl += $k } else { $off += $k }
     }
-    if ($off.Count -gt 0) { Say ("  Галочка СНЯТА (не будет сделано): " + ($off -join ' ')) 'Yellow' }
-    if ($onl.Count -gt 0) { Say ("  Галочка ПОСТАВЛЕНА (будет сделано): " + ($onl -join ' ')) 'Green' }
-    if ($off.Count -eq 0 -and $onl.Count -eq 0) { Warn 'Не понял ввод. Номера пунктов через пробел, или Enter — выполнить отмеченное.' }
+    if ($off.Count -gt 0) { Say ((L 'm199') + ($off -join ' ')) 'Yellow' }
+    if ($onl.Count -gt 0) { Say ((L 'm200') + ($onl -join ' ')) 'Green' }
+    if ($off.Count -eq 0 -and $onl.Count -eq 0) { Warn (L 'm201') }
   }
   $sel = @($items | Where-Object { $_.On })
-  if ($sel.Count -eq 0) { OptLog 'Ничего не отмечено — ничего не менялось.'; return }
+  if ($sel.Count -eq 0) { OptLog (L 'm202'); return }
   Say ''
-  Say 'Будет сделано:' 'White'
+  Say (L 'm203') 'White'
   foreach ($it in $sel) { Say ("  - " + $it.Text) }
-  $autoOff = @($items | Where-Object { -not $_.On -and $_.Kind -eq 'disable' -and $_.Group -like 'Лишнее системное: реклама*' })
-  if ($autoOff.Count -gt 0) { Warn ("С {0} пунктов «реклама, сбор данных, мусор» галочка снята — они останутся включены: {1}" -f $autoOff.Count, (($autoOff | ForEach-Object { $_.Pkg }) -join ', ')) }
-  Say ("Пунктов: {0}. Всё, кроме очистки кэша, обратимо: пункт 3 в меню («Откат»)." -f $sel.Count) 'White'
-  if (-not (Confirm-Yes 'Выполнить? Введи «да»')) { OptLog 'Отменено — ничего не менялось.'; return }
+  $autoOff = @($items | Where-Object { -not $_.On -and $_.Kind -eq 'disable' -and $_.Tier -eq 'auto' })
+  if ($autoOff.Count -gt 0) { Warn ((L 'm204') -f $autoOff.Count, (($autoOff | ForEach-Object { $_.Pkg }) -join ', ')) }
+  Say ((L 'm205') -f $sel.Count) 'White'
+  if (-not (Confirm-Yes (L 'm206') (L 'w012'))) { OptLog (L 'm207'); return }
 
   # --- снимок «до» и журнал — до первого изменения
   $bdir = Join-Path $RepDir 'backup'
@@ -1019,15 +1252,16 @@ function Invoke-Optimization {
   $script:State = [ordered]@{
     kit = "phone-kit $KitVersion"; created = (Get-Date -Format 's'); label = $Label; serial = $script:Serial; serialno = (P 'ro.serialno')
     model = $model; device = (P 'ro.product.device'); fingerprint = (P 'ro.build.fingerprint'); sdk = $script:sdk
-    before = [ordered]@{ disabled = @($disabled | Sort-Object); uninstalled = @($preUninst | Sort-Object); home = $homeComp; anim = @($set['Анимация окон'], $set['Анимация переходов'], $set['Длительность анимаций']); dns = @($set['Частный DNS (режим)'], $set['Частный DNS (адрес)']) }
+    before = [ordered]@{ disabled = @($disabled | Sort-Object); uninstalled = @($preUninst | Sort-Object); home = $homeComp; anim = @($set['anim_w'], $set['anim_t'], $set['anim_d']); dns = @($set['dns_mode'], $set['dns_spec']) }
     journal = $script:Journal
   }
   Save-State
-  OptLog ('снимок «до» и журнал: ' + $script:StateFiles[0]) 'ok'
+  OptLog ((L 'm208') + $script:StateFiles[0]) 'ok'
   $base = Get-Health
-  if ($base.HomeBad) { OptLog "внимание: рабочий стол уже до изменений не в порядке ($($base.Home))" 'warn' }
+  if ($base.HomeBad) { OptLog (L 'm209' $($base.Home)) 'warn' }
 
-  Title 'Оптимизация: выполняю'
+  Emit 'stage' @{ s = 'run' }
+  Title (L 'm210')
   $stopped = $false
   if ($sel | Where-Object { $_.Kind -eq 'anim' }) { Set-Anim '0.5' }
   $d = $sel | Where-Object { $_.Kind -eq 'dns' } | Select-Object -First 1
@@ -1039,33 +1273,35 @@ function Invoke-Optimization {
     $batch = $pk[$i..([math]::Min($i + 4, $pk.Count - 1))]
     $start = $script:Journal.Count
     foreach ($x in $batch) { [void](Disable-Pkg $x.Pkg -Third:($x.Kind -eq 'third')) }
+    Emit 'progress' @{ done = [math]::Min($i + 5, $pk.Count); total = $pk.Count }
     $prob = Compare-Health $base (Get-Health)
     if ($prob.Count) {
-      OptLog ('проблема после партии: ' + ($prob -join '; ') + ' — откатываю партию и останавливаюсь') 'bad'
+      OptLog ((L 'm211') + ($prob -join '; ') + (L 'm212')) 'bad'
       Undo-Journal $start; $stopped = $true; break
     }
-    OptLog ("партия {0}: проверка рабочего стола / Настроек / клавиатуры / SystemUI — ок" -f ([math]::Floor($i / 5) + 1)) 'ok'
+    OptLog ((L 'm213') -f ([math]::Floor($i / 5) + 1)) 'ok'
   }
   if (-not $stopped) {
     foreach ($b in @($sel | Where-Object { $_.Kind -eq 'bg' })) { [void](Restrict-Bg $b.Pkg) }
   }
 
   Say ''
-  if ($script:Journal.Count -eq 0) { OptLog 'Обратимых изменений нет.' 'warn'; return }
-  Say 'Проверь телефон (клиент — руками): рабочий стол и жесты, звонок и SMS (если есть SIM), уведомления мессенджеров и банков,' 'Cyan'
-  Say '  камера, разблокировка отпечатком/лицом, клавиатура, Wi-Fi/Bluetooth, Google Play, основные приложения клиента.' 'Cyan'
-  if (Confirm-Yes 'Что-то сломалось и надо откатить всё сделанное сейчас? (да / Enter — всё ок)') {
-    OptLog 'мастер попросил откат' 'warn'
+  if ($script:Journal.Count -eq 0) { OptLog (L 'm214') 'warn'; return }
+  Say (L 'm215') 'Cyan'
+  Say (L 'm216') 'Cyan'
+  if (Confirm-Yes (L 'm217') (L 'w013')) {
+    OptLog (L 'm218') 'warn'
     Undo-Journal 0
-    OptLog ('откат выполнен, рабочий стол: ' + (Get-HomeComp)) 'ok'
+    OptLog ((L 'm219') + (Get-HomeComp)) 'ok'
     return
   }
-  if (Confirm-Yes 'Перезагрузить телефон и проверить, что всё загружается и прошивка ничего не вернула? Рекомендую. (да / Enter — нет)') { Invoke-RebootCheck }
-  OptLog ("готово, записей в журнале изменений: {0}. Откат — пункт 3 в меню (журнал: backups/{1}.json)" -f $script:Journal.Count, $repName) 'ok'
+  if (Confirm-Yes (L 'm220') (L 'w014')) { Invoke-RebootCheck }
+  OptLog ((L 'm221') -f $script:Journal.Count, $repName) 'ok'
 }
 
 function Invoke-Restore {
-  Title 'Откат изменений'
+  Emit 'stage' @{ s = 'restore' }
+  Title (L 'm222')
   $script:Props = Parse-Props (Sh 'getprop')
   $script:sdk = 0; [void][int]::TryParse((P 'ro.build.version.sdk'), [ref]$script:sdk)
   $mdl = P 'ro.product.model'; $fp = P 'ro.build.fingerprint'; $sn = P 'ro.serialno'
@@ -1083,37 +1319,39 @@ function Invoke-Restore {
     }
   }
   if ($found.Count -eq 0) {
-    Warn "Для этой модели ($mdl) нет журналов с изменениями."
-    Say '  Если оптимизация делалась с другого компьютера: положи state.json из архива отчёта (папка backup) в папку backups и запусти откат снова.'
+    Warn (L 'm223' $mdl)
+    Say (L 'm224')
     return
   }
   $groups = @($found | Group-Object Key | Sort-Object { $_.Group[0].J.created } -Descending)
   for ($i = 0; $i -lt $groups.Count; $i++) {
     $j = $groups[$i].Group[0].J
-    $same = if ($j.fingerprint -eq $fp) { 'та же прошивка' } else { 'ДРУГАЯ прошивка' }
-    if (-not $groups[$i].Group[0].Same) { $same += ', ДРУГОЙ экземпляр телефона' }
+    $same = if ($j.fingerprint -eq $fp) { (L 'm225') } else { (L 'm226') }
+    if (-not $groups[$i].Group[0].Same) { $same += (L 'm227') }
     $when = $j.created; if ($when -is [datetime]) { $when = $when.ToString('yyyy-MM-dd HH:mm') }
-    Say ("  {0}) {1}  {2}  записей: {3}  ({4})" -f ($i + 1), $when, $j.label, @($j.journal).Count, $same) 'White'
+    Say ((L 'm228') -f ($i + 1), $when, $j.label, @($j.journal).Count, $same) 'White'
   }
-  $a = ([string](Read-Host 'Какой откатить (номер, Enter — 1, Q — выход)')).Trim()
+  $ropts = @(for ($i = 0; $i -lt $groups.Count; $i++) { $j = $groups[$i].Group[0].J; $when = $j.created; if ($when -is [datetime]) { $when = $when.ToString('yyyy-MM-dd HH:mm') }; Opt ([string]($i + 1)) ("{0}  {1}  ({2})" -f $when, $j.label, @($j.journal).Count) })
+  $ropts += (Opt 'Q' (L 'w021'))
+  $a = Ask (L 'm229') 'menu' $ropts
   if ($a -match '^[QqЙй]$') { return }
   $n = 1; if ($a -match '^\d+$') { $n = [int]$a }
-  if ($n -lt 1 -or $n -gt $groups.Count) { Warn 'Нет такого номера.'; return }
+  if ($n -lt 1 -or $n -gt $groups.Count) { Warn (L 'm230'); return }
   $g = $groups[$n - 1]
   $j = $g.Group[0].J
   Say ''
-  Say 'Будет откатано (в обратном порядке):' 'White'
+  Say (L 'm231') 'White'
   $entries = @($j.journal)
   for ($i = $entries.Count - 1; $i -ge 0; $i--) {
     $e = $entries[$i]
     switch ([string]$e.t) {
-      'disable' { Say "  - включить обратно $($e.pkg)" }
-      'uninstall' { Say "  - вернуть $($e.pkg)" }
-      'setting' { Say "  - вернуть $($e.key) = $(if ($e.old -and $e.old -ne 'null') { $e.old } else { 'по умолчанию' })" }
-      'appops' { Say "  - разрешить фон $($e.pkg)" }
+      'disable' { Say (L 'm232' $($e.pkg)) }
+      'uninstall' { Say (L 'm233' $($e.pkg)) }
+      'setting' { Say (L 'm234' $($e.key) $(if ($e.old -and $e.old -ne 'null') { $e.old } else { (L 'm146') })) }
+      'appops' { Say (L 'm235' $($e.pkg)) }
     }
   }
-  if (-not (Confirm-Yes 'Откатить? Введи «да»')) { Say 'Отменено.'; return }
+  if (-not (Confirm-Yes (L 'm236') (L 'w015'))) { Say (L 'm237'); return }
   $stamp2 = Get-Date -Format 'yyyy-MM-dd_HH-mm'
   $rd = Join-Path $Root ("reports/" + $stamp2 + '_restore_' + ($mdl -replace '[^A-Za-z0-9_.-]', '_'))
   New-Item -ItemType Directory -Force -Path $rd | Out-Null
@@ -1127,10 +1365,10 @@ function Invoke-Restore {
   $script:keepSet = New-Object 'System.Collections.Generic.HashSet[string]'
   Undo-Journal 0
   $h = Get-HomeComp
-  if (Test-HomeBad $h) { OptLog "внимание: рабочий стол после отката: $h — проверь на телефоне" 'warn' } else { OptLog "откат завершён, рабочий стол: $h" 'ok' }
-  OptLog 'Перезагрузи телефон, чтобы всё вернулось окончательно.'
+  if (Test-HomeBad $h) { OptLog (L 'm238' $h) 'warn' } else { OptLog (L 'm239' $h) 'ok' }
+  OptLog (L 'm240')
   [IO.File]::WriteAllText((Join-Path $rd 'restore.txt'), ($script:OptLines -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
-  Ok ("Журнал отката: " + $rd)
+  Ok ((L 'm241') + $rd)
 }
 
 # ----------------------------------------------------------------- старт
@@ -1142,8 +1380,8 @@ $script:RuLevel = @{}
 if ($Prepare) { Invoke-Prepare }
 
 Clear-Host
-Say "Телефон-набор $KitVersion (Android: Samsung, Xiaomi, Realme, Honor и др.)" 'Cyan'
-Say ("Папка: $Root")
+Say (L 'm242' $KitVersion) 'Cyan'
+Say ((L 'm243' $Root))
 $script:Adb = Get-AdbBinary
 Ok "ADB: $script:Adb"
 
@@ -1152,22 +1390,32 @@ $ruFile = Join-Path $Root 'data/ru.tsv'
 $uadFile = Join-Path $Root 'data/uad.tsv'
 $ruNote = @{}
 if (Test-Path $ruFile) { foreach ($r in (Import-Csv -Path $ruFile -Delimiter "`t" -Encoding UTF8)) { $script:RuLevel[$r.package] = $r.level; $ruNote[$r.package] = $r.note } }
+# Пояснения к пакетам на языке мастера: data/notes/<код>.tsv (package, note); нет файла — английский
+if ($script:Lang -ne 'ru') {
+  $nf = Join-Path (Join-Path $Root 'data') (Join-Path 'notes' ($script:Lang + '.tsv'))
+  if (-not (Test-Path -LiteralPath $nf)) { $nf = Join-Path (Join-Path $Root 'data') (Join-Path 'notes' 'en.tsv') }
+  if (Test-Path -LiteralPath $nf) { foreach ($r in (Import-Csv -Path $nf -Delimiter "`t" -Encoding UTF8)) { if ($r.note) { $ruNote[$r.package] = $r.note } } }
+}
 
+# Интерфейс: страница в браузере (по умолчанию), консоль — запасной вариант и для тестов
+$useWeb = $Web -or (-not $Console -and -not [Console]::IsInputRedirected)
+if ($useWeb) { if (-not (Start-Web)) { Warn (L 'w005') } }
+Emit 'stage' @{ s = 'start' }
 $Mode = 'diag'
 while ($true) {
   Say ''
-  Say 'Что делаем?' 'White'
-  Say '  1) Диагностика (только чтение, ничего не меняет)' 'White'
-  Say '  2) Оптимизация: диагностика -> план -> твоё «да» -> изменения партиями с проверкой' 'White'
-  Say '  3) Откат изменений, сделанных пунктом 2' 'White'
-  Say '  Q) Выход' 'White'
-  $m = ([string](Read-Host 'Выбор')).Trim()
+  Say (L 'm244') 'White'
+  Say (L 'm245') 'White'
+  Say (L 'm246') 'White'
+  Say (L 'm247') 'White'
+  Say (L 'm248') 'White'
+  $m = Ask (L 'm249') 'menu' @((Opt '1' ((L 'm245') -replace '^\s*\w\)\s*', '')), (Opt '2' ((L 'm246') -replace '^\s*\w\)\s*', '')), (Opt '3' ((L 'm247') -replace '^\s*\w\)\s*', '')), (Opt 'Q' ((L 'm248') -replace '^\s*\w\)\s*', ''))) @{ screen = 'start' }
   if ($m -eq '1') { $Mode = 'diag'; break }
   if ($m -eq '2') { $Mode = 'opt'; break }
   if ($m -eq '3') { $Mode = 'restore'; break }
   if ($m -match '^[QqЙй]$') { Finish 0 }
 }
-if (-not $Label -and $Mode -ne 'restore') { $Label = ([string](Read-Host 'Метка клиента для папки отчёта (например: Максим), Enter — без метки')).Trim() }
+if (-not $Label -and $Mode -ne 'restore') { $Label = Ask (L 'm250') 'text' $null @{ optional = $true } }
 
 # Встроенный поиск по сети (mDNS) в adb: на Windows без Bonjour работает только с этим ключом.
 # Сервер перезапускаем, чтобы он подхватил ключ (если adb уже был запущен без него).
@@ -1176,23 +1424,26 @@ $env:ADB_MDNS_OPENSCREEN = '1'
 [void](Invoke-Adb @('start-server') 30)
 $script:AdbStarted = $true
 
-Title 'Подключение телефона'
+Emit 'stage' @{ s = 'connect'; mode = $Mode }
+Title (L 'm251')
 $script:Serial = Select-Phone
 if (-not (Wait-Authorized $script:Serial)) {
-  Bad 'Телефон не разрешил отладку (нет подтверждения на экране).'
+  Bad (L 'm252')
   Show-EnableHelp; Finish 1
 }
-Ok "Подключено: $script:Serial"
+Ok (L 'm253' $script:Serial)
+Emit 'device' @{ model = (Get-Model $script:Serial); serial = $script:Serial; wifi = ($script:Serial -match ':\d+$|_adb-tls') }
 if ((Sh 'getprop ro.build.characteristics') -match 'tv') {
-  Warn 'Похоже, это телевизор или приставка. Для них есть tv-kit — там другие правила и лаунчер.'
-  if (-not (Confirm-Yes 'Всё равно продолжить телефонным набором? (да / Enter — выход)')) { Finish 0 }
+  Warn (L 'm254')
+  if (-not (Confirm-Yes (L 'm255') (L 'w016'))) { Finish 0 }
 }
 if ($Mode -eq 'restore') { Invoke-Restore; Finish 0 }
 $script:OptLines = New-Object System.Collections.ArrayList
 
 # ----------------------------------------------------------------- сбор
 
-Title 'Собираю сведения (1–2 минуты, телефон можно не трогать)'
+Emit 'stage' @{ s = 'diag'; mode = $Mode }
+Title (L 'm256')
 $propsTxt = Sh 'getprop'
 $script:Props = Parse-Props $propsTxt
 $model = P 'ro.product.model'
@@ -1210,7 +1461,7 @@ $sdk = 0; [void][int]::TryParse((P 'ro.build.version.sdk'), [ref]$sdk)
 $step = 0
 function Step([string]$t) { $script:step++; Say ("  [{0}] {1}" -f $script:step, $t) }
 
-Step 'память и процессы'
+Step (L 'm257')
 $memTxt = Sh 'cat /proc/meminfo'; Save-Raw 'meminfo.txt' $memTxt
 $mem = Parse-Meminfo $memTxt
 $upTxt = Sh 'cat /proc/uptime'
@@ -1239,7 +1490,7 @@ function Get-PkgRssMb([string]$pkg) {
 }
 function Test-Running([string]$pkg) { foreach ($pr in $procs) { if ($pr.Name -eq $pkg -or $pr.Name.StartsWith($pkg + ':')) { return $true } }; return $false }
 
-Step 'процессор, батарея, нагрев'
+Step (L 'm258')
 $cpuTxt = Sh 'dumpsys cpuinfo'; Save-Raw 'cpuinfo.txt' $cpuTxt
 $cpuTotal = ''
 if ($cpuTxt -match '(?m)^\s*([\d.]+)% TOTAL') { $cpuTotal = $Matches[1] }
@@ -1260,18 +1511,18 @@ if ($batTxt -match '(?m)^\s*level: (\d+)') { $batLevel = $Matches[1] }
 if ($batTxt -match '(?m)^\s*temperature: (\d+)') { $batTemp = [double]$Matches[1] / 10 }
 if ($batTxt -match '(?m)^\s*health: (\d+)') { $batHealth = $Matches[1] }
 if ($batTxt -match '(?m)^\s*(AC|USB|Wireless) powered: true') { $batPlug = $Matches[1] }
-$healthName = @{ '1' = 'неизвестно'; '2' = 'хорошее'; '3' = 'ПЕРЕГРЕВ'; '4' = 'ИЗНОШЕНА'; '5' = 'перенапряжение'; '6' = 'неисправность'; '7' = 'переохлаждение' }[$batHealth]
+$healthName = @{ '1' = (L 'm259'); '2' = (L 'm260'); '3' = (L 'm261'); '4' = (L 'm262'); '5' = (L 'm263'); '6' = (L 'm264'); '7' = (L 'm265') }[$batHealth]
 $thTxt = Sh 'dumpsys thermalservice'; Save-Raw 'thermal.txt' $thTxt
 $thStatus = 0; if ($thTxt -match 'Thermal Status: (\d+)') { $thStatus = [int]$Matches[1] }
 $temps = @{}
 $curSec = $thTxt
 $ci = $thTxt.IndexOf('Current temperatures from HAL'); if ($ci -ge 0) { $curSec = $thTxt.Substring($ci); $cj = $curSec.IndexOf('Current cooling devices'); if ($cj -gt 0) { $curSec = $curSec.Substring(0, $cj) } }
 foreach ($m in [regex]::Matches($curSec, 'mValue=([\d.]+), mType=(\d+)')) {
-  $tn = @{ '0' = 'CPU'; '1' = 'GPU'; '2' = 'батарея'; '3' = 'корпус' }[$m.Groups[2].Value]
+  $tn = @{ '0' = 'CPU'; '1' = 'GPU'; '2' = (L 'm266'); '3' = (L 'm267') }[$m.Groups[2].Value]
   if ($tn) { $v = [math]::Round([double]$m.Groups[1].Value, 1); if ($v -gt 0 -and $v -lt 150 -and (-not $temps.ContainsKey($tn) -or $temps[$tn] -lt $v)) { $temps[$tn] = $v } }
 }
 
-Step 'хранилище'
+Step (L 'm268')
 $dfTxt = Sh 'df -k /data'; Save-Raw 'df.txt' $dfTxt
 $dataTotal = 0; $dataUsed = 0; $dataFree = 0
 foreach ($l in ($dfTxt -split "`n")) { if ($l -match '^\S+\s+(\d+)\s+(\d+)\s+(\d+)\s+\d+%') { $dataTotal = [int64]$Matches[1]; $dataUsed = [int64]$Matches[2]; $dataFree = [int64]$Matches[3] } }
@@ -1294,7 +1545,7 @@ if ($dsNames.Count -gt 0 -and $dsCache.Count -eq $dsNames.Count) {
 }
 if ($dsTxt -match '(?m)^(Photos|Videos|Audio|Downloads|System|Other) Size') { Save-Raw 'diskstats_summary.txt' (($dsTxt -split "`n" | Where-Object { $_ -match '^(Data-Free|Cache-Free|System-Free|Latency|Photos|Videos|Audio|Downloads|System|Other) ' }) -join "`n") }
 
-Step 'приложения'
+Step (L 'm269')
 $all = Parse-PkgList (Sh 'pm list packages')
 $allU = Parse-PkgList (Sh 'pm list packages -u')
 $sys = Parse-PkgList (Sh 'pm list packages -s')
@@ -1317,7 +1568,7 @@ $users = @(); foreach ($l in ($usersTxt -split "`n")) { if ($l -match 'UserInfo\
 $featTxt = Sh 'pm list features'
 $hasTel = ($featTxt -match 'feature:android\.hardware\.telephony(\s|$)')
 
-Step 'рабочий стол и приложения по умолчанию'
+Step (L 'm270')
 $homeTxt = Sh 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'
 $homeComp = ''
 foreach ($l in ($homeTxt -split "`n")) { if ($l -match '^\s*([A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)\s*$') { $homeComp = $Matches[1] } }
@@ -1330,7 +1581,7 @@ $roleShort = [ordered]@{}
 foreach ($rn in @('HOME', 'DIALER', 'SMS', 'BROWSER', 'ASSISTANT', 'WALLET', 'SYSTEM_SUPERVISION')) { $k = "android.app.role.$rn"; if ($roles.ContainsKey($k)) { $roleShort[$rn] = ($roles[$k] -join ', ') } }
 Save-Raw 'roles.txt' ((($roleShort.Keys | ForEach-Object { "$_ = $($roleShort[$_])" }) -join "`n") + "`nHOME(resolve) = $homeComp`nIME = $ime")
 
-Step 'чем пользуются (статистика использования)'
+Step (L 'm271')
 $usageTxt = Sh 'dumpsys usagestats' 120
 $usage = Parse-Usage $usageTxt
 $usageOk = ($usage.Count -ge 5)
@@ -1339,9 +1590,9 @@ foreach ($u in $usage.Values) { if ($u.Sec -ge 60 -or $u.Last -gt (Get-Date).Add
 $topUsage = $usage.Values | Where-Object { $_.Sec -ge 60 } | Sort-Object Sec -Descending | Select-Object -First 20
 # В отчёт — только сводка (сам dumpsys usagestats содержит лишние подробности о жизни владельца)
 Save-Raw 'usage_summary.txt' (($usage.Values | Sort-Object Sec -Descending | ForEach-Object { "{0}`t{1}`t{2}" -f $_.Pkg, $_.Sec, $(if ($_.Last -gt [datetime]::MinValue) { $_.Last.ToString('yyyy-MM-dd') } else { '' }) }) -join "`n")
-if (-not $usageOk) { [void]$script:Notes.Add('Статистика использования недоступна — все пункты отключения помечены «спросить», ограничение фона не предлагается') }
+if (-not $usageOk) { [void]$script:Notes.Add((L 'm272')) }
 
-Step 'безопасность: спецвозможности, администраторы, доступы'
+Step (L 'm273')
 $a11y = (Sh 'settings get secure enabled_accessibility_services').Trim()
 $nls = (Sh 'settings get secure enabled_notification_listeners').Trim()
 function Pkgs-FromComponents([string]$s) { $r = @(); foreach ($x in ($s -split ':')) { if ($x -match '^([A-Za-z0-9_.]+)/') { $r += $Matches[1] } }; return ,$r }
@@ -1351,8 +1602,8 @@ $dpTxt = Sh 'dumpsys device_policy'
 $adminPkgs = @(); foreach ($m in [regex]::Matches($dpTxt, 'ComponentInfo\{([A-Za-z0-9_.]+)/')) { $adminPkgs += $m.Groups[1].Value }
 $adminPkgs = @($adminPkgs | Select-Object -Unique)
 $owner = ''
-if ($dpTxt -match '(?m)Device Owner:\s*\r?\n?.*?admin=ComponentInfo\{([A-Za-z0-9_.]+)/') { $owner = "владелец устройства (организация): $($Matches[1])" }
-elseif ($dpTxt -match 'Device Owner') { $owner = 'есть владелец устройства (управляется организацией)' }
+if ($dpTxt -match '(?m)Device Owner:\s*\r?\n?.*?admin=ComponentInfo\{([A-Za-z0-9_.]+)/') { $owner = (L 'm274' $($Matches[1])) }
+elseif ($dpTxt -match 'Device Owner') { $owner = (L 'm275') }
 Save-Raw 'device_policy_summary.txt' ("admins: " + ($adminPkgs -join ', ') + "`n" + $owner)
 function Query-Op([string]$op) {
   $t = Sh "cmd appops query-op --user 0 $op allow"
@@ -1362,15 +1613,15 @@ function Query-Op([string]$op) {
 $overlayPkgs = @(); $installPkgs = @()
 if ($sdk -ge 29) { $overlayPkgs = Query-Op 'SYSTEM_ALERT_WINDOW'; $installPkgs = Query-Op 'REQUEST_INSTALL_PACKAGES' }
 
-Step 'сеть и настройки'
+Step (L 'm276')
 $connTxt = Sh 'dumpsys connectivity'
-$netType = 'не определён'
+$netType = (L 'm277')
 if ($connTxt -match 'Active default network: (\d+)') {
   $nid = $Matches[1]
   foreach ($l in ($connTxt -split "`n")) {
     if ($l -match "NetworkAgentInfo\{.*?network\{$nid\}" -or $l -match "NetworkAgentInfo \[.*?- $nid\]" -or $l -match "netId[:=] ?$nid\b") {
       if ($l -match 'WIFI') { $netType = 'Wi-Fi'; break }
-      if ($l -match 'CELLULAR|MOBILE') { $netType = 'мобильный интернет'; break }
+      if ($l -match 'CELLULAR|MOBILE') { $netType = (L 'm278'); break }
       if ($l -match 'VPN') { $netType = 'VPN'; break }
     }
   }
@@ -1378,22 +1629,36 @@ if ($connTxt -match 'Active default network: (\d+)') {
 $dnsBroken = ($connTxt -match 'PRIVATE_DNS_BROKEN')
 function G([string]$ns, [string]$k) { return (Sh "settings get $ns $k").Trim() }
 $set = [ordered]@{
-  'Анимация окон'          = (G global window_animation_scale)
-  'Анимация переходов'     = (G global transition_animation_scale)
-  'Длительность анимаций'  = (G global animator_duration_scale)
-  'Энергосбережение'       = (G global low_power)
-  'Частный DNS (режим)'    = (G global private_dns_mode)
-  'Частный DNS (адрес)'    = (G global private_dns_specifier)
-  'Не сохранять действия'  = (G global always_finish_activities)
-  'Лимит фоновых процессов' = (G global background_process_limit)
-  'Play Защита (проверка приложений)' = (G global package_verifier_enable)
-  'Отладка по USB'         = (G global adb_enabled)
-  'Беспроводная отладка'   = (G global adb_wifi_enabled)
-  'Клавиатура'             = $ime
+  'anim_w' = (G global window_animation_scale)
+  'anim_t' = (G global transition_animation_scale)
+  'anim_d' = (G global animator_duration_scale)
+  'low_power' = (G global low_power)
+  'dns_mode' = (G global private_dns_mode)
+  'dns_spec' = (G global private_dns_specifier)
+  'finish_act' = (G global always_finish_activities)
+  'bg_limit' = (G global background_process_limit)
+  'verifier' = (G global package_verifier_enable)
+  'adb' = (G global adb_enabled)
+  'adb_wifi' = (G global adb_wifi_enabled)
+  'ime' = $ime
+}
+$setLabel = [ordered]@{
+  'anim_w' = (L 'm279')
+  'anim_t' = (L 'm280')
+  'anim_d' = (L 'm281')
+  'low_power' = (L 'm282')
+  'dns_mode' = (L 'm283')
+  'dns_spec' = (L 'm284')
+  'finish_act' = (L 'm285')
+  'bg_limit' = (L 'm286')
+  'verifier' = (L 'm287')
+  'adb' = (L 'm288')
+  'adb_wifi' = (L 'm289')
+  'ime' = (L 'm290')
 }
 Save-Raw 'settings.txt' ((($set.Keys | ForEach-Object { "$_ = $($set[$_])" }) -join "`n") + "`naccessibility = $a11y`nnotification_listeners = $nls")
 
-Step 'сбои приложений'
+Step (L 'm291')
 $crashTxt = Sh 'logcat -d -b crash -t 400'
 Save-Raw 'crash_log.txt' $crashTxt
 $crashes = @{}
@@ -1404,7 +1669,7 @@ $oomBitmap = ($crashTxt -match 'OutOfMemoryError' -and $crashTxt -match '(?i)bit
 
 # ----------------------------------------------------------------- анализ
 
-Title 'Анализ'
+Title (L 'm292')
 $manu = (P 'ro.product.manufacturer'); $brand = (P 'ro.product.brand')
 $skin = ''
 if (P 'ro.build.version.oneui') { $v = [int](P 'ro.build.version.oneui'); $skin = ('One UI {0}.{1}' -f [math]::Floor($v / 10000), [math]::Floor(($v % 10000) / 100)) }
@@ -1415,13 +1680,13 @@ elseif (P 'ro.build.version.opporom') { $skin = 'ColorOS ' + (P 'ro.build.versio
 elseif (P 'ro.build.version.emui') { $skin = (P 'ro.build.version.emui') }
 elseif (P 'ro.build.version.magic') { $skin = 'MagicOS ' + (P 'ro.build.version.magic') }
 $isTablet = ((P 'ro.build.characteristics') -match 'tablet')
-$devType = $(if ($isTablet) { 'планшет' } else { 'телефон' }) + $(if ($hasTel) { ', есть SIM-модуль' } else { ', без SIM-модуля' })
+$devType = $(if ($isTablet) { (L 'm293') } else { (L 'm294') }) + $(if ($hasTel) { (L 'm295') } else { (L 'm296') })
 $vb = P 'ro.boot.verifiedbootstate'
 $hasGms = $all.Contains('com.google.android.gms')
 
 $uad = @{}
 if (Test-Path $uadFile) { foreach ($r in (Import-Csv -Path $uadFile -Delimiter "`t" -Encoding UTF8)) { $uad[$r.package] = $r } }
-else { [void]$script:Notes.Add('Нет data/uad.tsv — кандидаты на отключение не подобраны') }
+else { [void]$script:Notes.Add((L 'm297')) }
 
 # Кого не трогать никогда на этом телефоне: приложения по умолчанию, клавиатура, спецвозможности, уведомления, администраторы
 $roleSet = New-Object 'System.Collections.Generic.HashSet[string]'
@@ -1443,23 +1708,23 @@ foreach ($pkg in $sys) {
   $removal = if ($u) { $u.removal } elseif ($rl -eq 'ok') { 'Recommended' } else { 'Advanced' }
   if ($removal -in @('Expert', 'Unsafe') -and $rl -notin @('ok', 'ask')) { continue }
   $why = @()
-  if (Test-Protected $pkg) { $why += 'защищён правилами набора' }
-  if ($pkg -like 'com.android.*' -and $pkg -ne 'com.android.chrome' -and $removal -ne 'Recommended') { $why += 'системный пакет Android' }
-  if ($keepSet.Contains($pkg)) { $why += 'приложение по умолчанию / спецвозможности / уведомления / администратор' }
-  if ($usedPkgs.Contains($pkg)) { $why += 'им пользовались' }
+  if (Test-Protected $pkg) { $why += (L 'm298') }
+  if ($pkg -like 'com.android.*' -and $pkg -ne 'com.android.chrome' -and $removal -ne 'Recommended') { $why += (L 'm299') }
+  if ($keepSet.Contains($pkg)) { $why += (L 'm300') }
+  if ($usedPkgs.Contains($pkg)) { $why += (L 'm301') }
   if ($u -and $u.neededby) {
     $nb = @($u.neededby -split ',' | Where-Object { $_ -and $all.Contains($_) -and -not $disabled.Contains($_) })
-    if ($nb.Count) { $why += ('нужен для ' + ($nb -join ', ')) }
+    if ($nb.Count) { $why += ((L 'm302') + ($nb -join ', ')) }
   }
   $uname = ''; if ($u) { $uname = $u.name }
   $ask = ''
-  if (-not $usageOk) { $ask = 'нет статистики использования — спросить' }
-  elseif ($launchOk -and $launchable.Contains($pkg)) { $ask = 'это приложение со значком — спросить владельца' }
-  elseif (-not $launchOk) { $ask = 'не удалось проверить, приложение ли это — спросить' }
-  elseif ($rl -eq 'ask') { $ask = 'спросить владельца' }
-  elseif ($rl -ne 'ok' -and $removal -eq 'Advanced') { $ask = 'продвинутый уровень — только по согласию' }
-  elseif ($rl -ne 'ok' -and ($pkg + ' ' + $uname) -match $AskPattern) { $ask = 'функция — спросить владельца' }
-  elseif ($kids -and $rl -ne 'ok') { $ask = 'детское устройство — спросить родителей' }
+  if (-not $usageOk) { $ask = (L 'm303') }
+  elseif ($launchOk -and $launchable.Contains($pkg)) { $ask = (L 'm304') }
+  elseif (-not $launchOk) { $ask = (L 'm305') }
+  elseif ($rl -eq 'ask') { $ask = (L 'm306') }
+  elseif ($rl -ne 'ok' -and $removal -eq 'Advanced') { $ask = (L 'm307') }
+  elseif ($rl -ne 'ok' -and ($pkg + ' ' + $uname) -match $AskPattern) { $ask = (L 'm308') }
+  elseif ($kids -and $rl -ne 'ok') { $ask = (L 'm309') }
   # Уровень: auto — явный мусор (отмечен), base — база считает безопасным, но пользы мало (не отмечен), ask — спросить
   $tier = 'ask'
   if (-not $ask) { if ($rl -eq 'ok' -or ($pkg + ' ' + $uname) -match $AutoPattern) { $tier = 'auto' } else { $tier = 'base' } }
@@ -1478,30 +1743,30 @@ foreach ($pkg in $third) {
   $strong = @(); $weak = @(); $side = $false
   $inst = [string]$installer[$pkg]
   $preinst = ($inst -eq 'android' -or ((-not $inst -or $inst -eq 'null') -and $uad[$pkg]))   # поставлено производителем
-  if ($a11yPkgs -contains $pkg) { $strong += 'включена служба спецвозможностей (видит экран, нажимает за человека)' }
-  if ($adminPkgs -contains $pkg) { $strong += 'администратор устройства' }
+  if ($a11yPkgs -contains $pkg) { $strong += (L 'm310') }
+  if ($adminPkgs -contains $pkg) { $strong += (L 'm311') }
   $webapk = ($pkg -like 'org.chromium.webapk.*')
   if (-not $webapk) {
     $store = ($inst -match $StoreInstallers)
-    if ($inst -eq 'com.android.shell') { $strong += 'установлено через ADB с компьютера'; $side = $true }
-    elseif ($inst -and $inst -ne 'null' -and -not $store -and -not $preinst) { $strong += "установлено не из магазина (через $inst)"; $side = $true }
-    elseif ((-not $inst -or $inst -eq 'null') -and -not $preinst) { $weak += 'источник установки неизвестен' }
+    if ($inst -eq 'com.android.shell') { $strong += (L 'm312'); $side = $true }
+    elseif ($inst -and $inst -ne 'null' -and -not $store -and -not $preinst) { $strong += (L 'm313' $inst); $side = $true }
+    elseif ((-not $inst -or $inst -eq 'null') -and -not $preinst) { $weak += (L 'm314') }
     # Без значка — подозрительно только для поставленного не из магазина и не производителем (у сервисов из Play значка часто нет)
-    if ($launchOk -and -not $launchable.Contains($pkg) -and -not $roleSet.Contains($pkg) -and -not $store -and -not $preinst) { $strong += 'нет значка в меню' }
+    if ($launchOk -and -not $launchable.Contains($pkg) -and -not $roleSet.Contains($pkg) -and -not $store -and -not $preinst) { $strong += (L 'm315') }
   }
-  if ($nlsPkgs -contains $pkg) { $weak += 'читает уведомления' }
-  if ($overlayPkgs -contains $pkg) { $weak += 'показывается поверх других окон' }
-  if ($installPkgs -contains $pkg) { $weak += 'может устанавливать другие приложения' }
+  if ($nlsPkgs -contains $pkg) { $weak += (L 'm316') }
+  if ($overlayPkgs -contains $pkg) { $weak += (L 'm317') }
+  if ($installPkgs -contains $pkg) { $weak += (L 'm318') }
   $cleaner = ($pkg -match $CleanerPattern)
-  if ($cleaner) { $strong += 'чистильщик / ускоритель (обычно реклама, пользы нет)' }
+  if ($cleaner) { $strong += (L 'm319') }
   $lvl = ''
-  if ($strong.Count -ge 2 -or ($side -and $weak.Count -ge 1) -or $cleaner) { $lvl = 'ВНИМАНИЕ' }
-  elseif ($strong.Count -ge 1 -or ($weak.Count -ge 2 -and $inst -notmatch $StoreInstallers)) { $lvl = 'проверить' }
-  if ($webapk) { $lvl = 'проверить'; $weak += 'веб-приложение из Chrome («Установить приложение»)' }
+  if ($strong.Count -ge 2 -or ($side -and $weak.Count -ge 1) -or $cleaner) { $lvl = 'warn' }
+  elseif ($strong.Count -ge 1 -or ($weak.Count -ge 2 -and $inst -notmatch $StoreInstallers)) { $lvl = 'check' }
+  if ($webapk) { $lvl = 'check'; $weak += (L 'm320') }
   if ($lvl) { $susp += [pscustomobject]@{ Pkg = $pkg; Level = $lvl; Why = (($strong + $weak) -join '; '); Used = $usedPkgs.Contains($pkg); Mb = (Get-PkgRssMb $pkg) } }
 }
-$susp = @($susp | Sort-Object @{ e = { if ($_.Level -eq 'ВНИМАНИЕ') { 0 } else { 1 } } }, Pkg)
-$suspOk = @($susp | Where-Object { $_.Level -eq 'ВНИМАНИЕ' -and -not $roleSet.Contains($_.Pkg) })
+$susp = @($susp | Sort-Object @{ e = { if ($_.Level -eq 'warn') { 0 } else { 1 } } }, Pkg)
+$suspOk = @($susp | Where-Object { $_.Level -eq 'warn' -and -not $roleSet.Contains($_.Pkg) })
 
 # --- фон: сторонние, которые больше месяца не открывали, но сейчас работают
 $bgCands = @()
@@ -1520,122 +1785,122 @@ $obs = New-Object System.Collections.ArrayList
 $memTotal = $mem['MemTotal']; $memAvail = $mem['MemAvailable']
 if ($memTotal) {
   $pct = [math]::Round(100 * $memAvail / $memTotal)
-  if ($memAvail -lt 400 * 1024 -or $pct -lt 10) { [void]$obs.Add("Мало свободной памяти: $(Mb $memAvail) МБ из $(Mb $memTotal) ($pct%). Главная причина тормозов на слабых телефонах.") }
+  if ($memAvail -lt 400 * 1024 -or $pct -lt 10) { [void]$obs.Add((L 'm321' $(Mb $memAvail) $(Mb $memTotal) $pct)) }
 }
-if ($mem['SwapTotal'] -gt 0) { $swUsed = $mem['SwapTotal'] - $mem['SwapFree']; if ($swUsed -gt 0.8 * $mem['SwapTotal']) { [void]$obs.Add("Подкачка почти заполнена: $(Mb $swUsed) из $(Mb $mem['SwapTotal']) МБ.") } }
-if ($uptimeSec -gt 14 * 86400) { [void]$obs.Add("Телефон не перезагружался $([math]::Floor($uptimeSec / 86400)) дн. Перезагрузка раз в неделю помогает.") }
-if ($uptimeSec -lt 600) { [void]$obs.Add('Телефон включён меньше 10 минут — цифры памяти и процессора могут быть смещены (идёт оптимизация после загрузки).') }
-if ($dataPct -ge 85) { [void]$obs.Add("Память телефона заполнена на $dataPct%: свободно $(Mb $dataFree) МБ. При заполнении больше 90% Android сильно тормозит.") }
-if ($set['Энергосбережение'] -eq '1') { [void]$obs.Add('Включено энергосбережение — оно режет скорость процессора. Если тормоза важнее батареи — выключить (Настройки -> Батарея).') }
-if ($thStatus -gt 0) { [void]$obs.Add("Телефон греется: тепловой статус $thStatus (0 — норма), частоты снижаются.") }
-if ($batTemp -ge 40) { [void]$obs.Add("Батарея горячая: $batTemp °C.") }
-if ($batHealth -and $batHealth -ne '2') { [void]$obs.Add("Состояние батареи: $healthName.") }
+if ($mem['SwapTotal'] -gt 0) { $swUsed = $mem['SwapTotal'] - $mem['SwapFree']; if ($swUsed -gt 0.8 * $mem['SwapTotal']) { [void]$obs.Add((L 'm322' $(Mb $swUsed) $(Mb $mem['SwapTotal']))) } }
+if ($uptimeSec -gt 14 * 86400) { [void]$obs.Add((L 'm323' $([math]::Floor($uptimeSec / 86400)))) }
+if ($uptimeSec -lt 600) { [void]$obs.Add((L 'm324')) }
+if ($dataPct -ge 85) { [void]$obs.Add((L 'm325' $dataPct $(Mb $dataFree))) }
+if ($set['low_power'] -eq '1') { [void]$obs.Add((L 'm326')) }
+if ($thStatus -gt 0) { [void]$obs.Add((L 'm327' $thStatus)) }
+if ($batTemp -ge 40) { [void]$obs.Add((L 'm328' $batTemp)) }
+if ($batHealth -and $batHealth -ne '2') { [void]$obs.Add((L 'm329' $healthName)) }
 $patch = P 'ro.build.version.security_patch'
-if ($patch -match '^\d{4}-\d\d-\d\d$') { $pd = [datetime]::ParseExact($patch, 'yyyy-MM-dd', $null); if ($pd -lt (Get-Date).AddMonths(-12)) { [void]$obs.Add("Патч безопасности старый: $patch. Проверить «Обновление ПО»; если обновлений нет — телефон больше не поддерживается.") } }
-if ($set['Не сохранять действия'] -eq '1') { [void]$obs.Add('Включено «Не сохранять действия» (для разработчиков) — приложения перезапускаются при каждом переключении. Выключить вручную.') }
-if ($set['Лимит фоновых процессов'] -and $set['Лимит фоновых процессов'] -notin @('null', '-1', '')) { [void]$obs.Add("Задан «Лимит фоновых процессов» = $($set['Лимит фоновых процессов']) — уведомления могут опаздывать. Лучше «Стандартное ограничение».") }
-if ($set['Play Защита (проверка приложений)'] -eq '0') { [void]$obs.Add('Play Защита выключена — включить: Google Play -> профиль -> Play Защита.') }
-if ($vb -and $vb -ne 'green') { [void]$obs.Add("Загрузчик/прошивка не стоковые (verifiedbootstate=$vb): root или кастомная прошивка — быть особенно осторожным.") }
-if ($cpuTotal -and [double]$cpuTotal -gt 60) { [void]$obs.Add("Высокая загрузка процессора в покое: $cpuTotal%.") }
-foreach ($pr in $topProcs) { if ($pr.Kb -gt 400 * 1024 -and $pr.Name -notmatch '^(system_server|com\.android\.systemui)$') { [void]$obs.Add("Тяжёлый процесс: $($pr.Name) — $(Mb $pr.Kb) МБ.") } }
-foreach ($k in $crashes.Keys) { if ($crashes[$k] -ge 2) { [void]$obs.Add("Приложение падало: $k — $($crashes[$k]) раз(а) в журнале сбоев.") } }
-if ($oomBitmap) { [void]$obs.Add('В журнале сбоев «OutOfMemoryError ... Bitmap»: часто виновато веб-приложение из Chrome с огромной иконкой (org.chromium.webapk.*) — удалить его.') }
-if ($dnsBroken) { [void]$obs.Add('Частный DNS сейчас не работает (PRIVATE_DNS_BROKEN) — сайты/приложения могут не открываться.') }
-if (@($susp | Where-Object { $_.Level -eq 'ВНИМАНИЕ' }).Count) { [void]$obs.Add(("Подозрительные приложения: {0} — см. раздел 6." -f (@($susp | Where-Object { $_.Level -eq 'ВНИМАНИЕ' } | ForEach-Object { $_.Pkg }) -join ', '))) }
-if ($third.Count -gt 150) { [void]$obs.Add("Установлено очень много приложений: $($third.Count).") }
-if ($kids) { [void]$obs.Add('Детское устройство (Family Link / Samsung Kids): родительский контроль не трогаем, отключения — только по согласию родителей.') }
-if ($owner) { [void]$obs.Add("Телефон управляется организацией: $owner. Ничего не менять без согласия администратора.") }
-if ($users.Count -gt 1) { [void]$obs.Add("На телефоне несколько пользователей/пространств: $($users -join ', '). Изменения касаются только основного (0).") }
-if ($set['Анимация окон'] -in @('', 'null', '1', '1.0')) { [void]$obs.Add('Анимации на стандартной скорости (1x) — можно ускорить до 0.5x.') }
+if ($patch -match '^\d{4}-\d\d-\d\d$') { $pd = [datetime]::ParseExact($patch, 'yyyy-MM-dd', $null); if ($pd -lt (Get-Date).AddMonths(-12)) { [void]$obs.Add((L 'm330' $patch)) } }
+if ($set['finish_act'] -eq '1') { [void]$obs.Add((L 'm331')) }
+if ($set['bg_limit'] -and $set['bg_limit'] -notin @('null', '-1', '')) { [void]$obs.Add((L 'm332' $($set['bg_limit']))) }
+if ($set['verifier'] -eq '0') { [void]$obs.Add((L 'm333')) }
+if ($vb -and $vb -ne 'green') { [void]$obs.Add((L 'm334' $vb)) }
+if ($cpuTotal -and [double]$cpuTotal -gt 60) { [void]$obs.Add((L 'm335' $cpuTotal)) }
+foreach ($pr in $topProcs) { if ($pr.Kb -gt 400 * 1024 -and $pr.Name -notmatch '^(system_server|com\.android\.systemui)$') { [void]$obs.Add((L 'm336' $($pr.Name) $(Mb $pr.Kb))) } }
+foreach ($k in $crashes.Keys) { if ($crashes[$k] -ge 2) { [void]$obs.Add((L 'm337' $k $($crashes[$k]))) } }
+if ($oomBitmap) { [void]$obs.Add((L 'm338')) }
+if ($dnsBroken) { [void]$obs.Add((L 'm339')) }
+if (@($susp | Where-Object { $_.Level -eq 'warn' }).Count) { [void]$obs.Add(((L 'm340') -f (@($susp | Where-Object { $_.Level -eq 'warn' } | ForEach-Object { $_.Pkg }) -join ', '))) }
+if ($third.Count -gt 150) { [void]$obs.Add((L 'm341' $($third.Count))) }
+if ($kids) { [void]$obs.Add((L 'm342')) }
+if ($owner) { [void]$obs.Add((L 'm343' $owner)) }
+if ($users.Count -gt 1) { [void]$obs.Add((L 'm344' $($users -join ', '))) }
+if ($set['anim_w'] -in @('', 'null', '1', '1.0')) { [void]$obs.Add((L 'm345')) }
 
 # ----------------------------------------------------------------- отчёт
 
 $script:ReportLines = New-Object System.Collections.Generic.List[string]
 function W([string]$t = '') { $script:ReportLines.Add($t) }
 function Pkg-Name([string]$p) { $n = $ruNote[$p]; if (-not $n -and $uad[$p]) { $n = $uad[$p].name }; if ($n) { return "$p ($n)" } return $p }
-if ($Mode -eq 'opt') { W "ОТЧЁТ ТЕЛЕФОН-НАБОРА ${KitVersion}: диагностика «до» + оптимизация (что сделано — раздел 11)" } else { W "ОТЧЁТ ТЕЛЕФОН-НАБОРА $KitVersion (только диагностика, на телефоне ничего не менялось)" }
-W ("Дата: " + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
-if ($Label) { W ("Клиент: " + $Label) }
-W ("Подключение: " + $(if ($script:Serial -match ':\d+$|_adb-tls') { 'Wi-Fi' } else { 'кабель USB' }))
+if ($Mode -eq 'opt') { W (L 'm346' ${KitVersion}) } else { W (L 'm347' $KitVersion) }
+W ((L 'm348') + (Get-Date -Format 'yyyy-MM-dd HH:mm'))
+if ($Label) { W ((L 'm349') + $Label) }
+W ((L 'm350') + $(if ($script:Serial -match ':\d+$|_adb-tls') { 'Wi-Fi' } else { (L 'm351') }))
 W ''
-W '1. УСТРОЙСТВО'
-W ("  Марка / модель:   {0} / {1}  (устройство: {2}, производитель: {3})" -f $brand, $model, (P 'ro.product.device'), $manu)
-W ("  Тип:              $devType")
-W ("  Android:          {0} (SDK {1}), патч безопасности {2}" -f (P 'ro.build.version.release'), $sdk, $patch)
-W ("  Оболочка:         {0}" -f $(if ($skin) { $skin } else { 'не определена' }))
-W ("  Прошивка:         {0}" -f (P 'ro.build.display.id'))
-W ("  Отпечаток:        {0}" -f (P 'ro.build.fingerprint'))
-W ("  Загрузчик:        verifiedbootstate={0}, flash.locked={1}" -f $vb, (P 'ro.boot.flash.locked'))
-W ("  Платформа:        {0} {1}, ABI: {2}" -f (P 'ro.hardware'), (P 'ro.board.platform'), (P 'ro.product.cpu.abilist'))
-W ("  Сервисы Google:   {0}" -f $(if ($hasGms) { 'есть' } else { 'нет' }))
-W ("  Пользователи:     {0}" -f ($users -join ', '))
+W (L 'm352')
+W ((L 'm353') -f $brand, $model, (P 'ro.product.device'), $manu)
+W ((L 'm354' $devType))
+W ((L 'm355') -f (P 'ro.build.version.release'), $sdk, $patch)
+W ((L 'm356') -f $(if ($skin) { $skin } else { (L 'm357') }))
+W ((L 'm358') -f (P 'ro.build.display.id'))
+W ((L 'm359') -f (P 'ro.build.fingerprint'))
+W ((L 'm360') -f $vb, (P 'ro.boot.flash.locked'))
+W ((L 'm361') -f (P 'ro.hardware'), (P 'ro.board.platform'), (P 'ro.product.cpu.abilist'))
+W ((L 'm362') -f $(if ($hasGms) { (L 'm363') } else { (L 'm364') }))
+W ((L 'm365') -f ($users -join ', '))
 W ''
-W '2. БАТАРЕЯ, НАГРЕВ, ПРОЦЕССОР'
-W ("  Батарея:          {0}%, {1} °C, состояние: {2}{3}" -f $batLevel, $batTemp, $healthName, $(if ($batPlug) { ", заряжается ($batPlug)" } else { '' }))
-W ("  Энергосбережение: {0}" -f $(if ($set['Энергосбережение'] -eq '1') { 'ВКЛЮЧЕНО' } else { 'выключено' }))
-W ("  Тепловой статус:  {0} (0 — норма){1}" -f $thStatus, $(if ($temps.Count) { '; ' + (($temps.Keys | ForEach-Object { "$_ $($temps[$_]) °C" }) -join ', ') } else { '' }))
-if ($cores) { W ("  Ядра (МГц сейчас/макс): " + (($cores | ForEach-Object { "$($_.CurMhz)/$($_.MaxMhz)" }) -join '  ')) }
-W ("  Нагрузка:         loadavg {0}; CPU TOTAL {1}%" -f $load, $cpuTotal)
-if ($cpuTop) { W '  Больше всего процессора:'; foreach ($c in $cpuTop) { W ("    {0,5}%  {1}" -f $c.Pct, $c.Name) } }
+W (L 'm366')
+W ((L 'm367') -f $batLevel, $batTemp, $healthName, $(if ($batPlug) { (L 'm368' $batPlug) } else { '' }))
+W ((L 'm369') -f $(if ($set['low_power'] -eq '1') { (L 'm370') } else { (L 'm371') }))
+W ((L 'm372') -f $thStatus, $(if ($temps.Count) { '; ' + (($temps.Keys | ForEach-Object { "$_ $($temps[$_]) °C" }) -join ', ') } else { '' }))
+if ($cores) { W ((L 'm373') + (($cores | ForEach-Object { "$($_.CurMhz)/$($_.MaxMhz)" }) -join '  ')) }
+W ((L 'm374') -f $load, $cpuTotal)
+if ($cpuTop) { W (L 'm375'); foreach ($c in $cpuTop) { W ("    {0,5}%  {1}" -f $c.Pct, $c.Name) } }
 W ''
-W '3. ПАМЯТЬ И ХРАНИЛИЩЕ'
-W ("  ОЗУ:              всего {0} МБ, доступно {1} МБ" -f (Mb $memTotal), (Mb $memAvail))
-W ("  Подкачка:         всего {0} МБ, свободно {1} МБ" -f (Mb $mem['SwapTotal']), (Mb $mem['SwapFree']))
-W ("  Без перезагрузки: {0} дн. {1} ч" -f [math]::Floor($uptimeSec / 86400), [math]::Floor(($uptimeSec % 86400) / 3600))
-W ("  Память телефона:  всего {0} МБ, занято {1} МБ ({2}%), свободно {3} МБ; кэш приложений ~{4} МБ" -f (Mb $dataTotal), (Mb $dataUsed), $dataPct, (Mb $dataFree), $cacheMb)
-if ($bigApps) { W '  Самые большие приложения (программа + данные + кэш):'; foreach ($b in $bigApps) { W ("    {0,6} МБ  {1}  (кэш {2} МБ)" -f $b.Mb, $b.Pkg, $b.CacheMb) } }
-W '  Самые тяжёлые процессы (ОЗУ):'
-foreach ($pr in $topProcs) { W ("    {0,6} МБ  {1}" -f (Mb $pr.Kb), $pr.Name) }
+W (L 'm376')
+W ((L 'm377') -f (Mb $memTotal), (Mb $memAvail))
+W ((L 'm378') -f (Mb $mem['SwapTotal']), (Mb $mem['SwapFree']))
+W ((L 'm379') -f [math]::Floor($uptimeSec / 86400), [math]::Floor(($uptimeSec % 86400) / 3600))
+W ((L 'm380') -f (Mb $dataTotal), (Mb $dataUsed), $dataPct, (Mb $dataFree), $cacheMb)
+if ($bigApps) { W (L 'm381'); foreach ($b in $bigApps) { W ((L 'm382') -f $b.Mb, $b.Pkg, $b.CacheMb) } }
+W (L 'm383')
+foreach ($pr in $topProcs) { W ((L 'm384') -f (Mb $pr.Kb), $pr.Name) }
 W ''
-W '4. ЧЕМ ПОЛЬЗУЮТСЯ (по статистике телефона)'
-if ($topUsage) { foreach ($u in $topUsage) { W ("  {0,-12} {1}   (последний раз: {2})" -f (Fmt-Dur $u.Sec), $u.Pkg, $(if ($u.Last -gt [datetime]::MinValue) { $u.Last.ToString('yyyy-MM-dd') } else { '?' })) } }
-else { W '  Статистика недоступна или пуста.' }
+W (L 'm385')
+if ($topUsage) { foreach ($u in $topUsage) { W ((L 'm386') -f (Fmt-Dur $u.Sec), $u.Pkg, $(if ($u.Last -gt [datetime]::MinValue) { $u.Last.ToString('yyyy-MM-dd') } else { '?' })) } }
+else { W (L 'm387') }
 W ''
-W ("5. ПРИЛОЖЕНИЯ: всего {0}, системных {1}, установленных пользователем {2}, отключённых {3}, убранных для пользователя {4}" -f $all.Count, $sys.Count, $third.Count, $disabled.Count, $preUninst.Count)
-W ('  Установлены пользователем: ' + (($third | Sort-Object) -join ', '))
-if ($disabled.Count) { W ('  Уже отключены (до нас — обратно не включаем): ' + (($disabled | Sort-Object) -join ', ')) }
-if ($preUninst.Count) { W ('  Уже убраны для пользователя (до нас): ' + (($preUninst | Sort-Object) -join ', ')) }
-if ($bloat3.Count) { W ('  Предустановленные, которыми не пользуются (если не нужны — удалить обычным способом в Настройках): ' + (($bloat3 | ForEach-Object { Pkg-Name $_ }) -join ', ')) }
+W ((L 'm388') -f $all.Count, $sys.Count, $third.Count, $disabled.Count, $preUninst.Count)
+W ((L 'm389') + (($third | Sort-Object) -join ', '))
+if ($disabled.Count) { W ((L 'm390') + (($disabled | Sort-Object) -join ', ')) }
+if ($preUninst.Count) { W ((L 'm391') + (($preUninst | Sort-Object) -join ', ')) }
+if ($bloat3.Count) { W ((L 'm392') + (($bloat3 | ForEach-Object { Pkg-Name $_ }) -join ', ')) }
 W ''
-W '6. БЕЗОПАСНОСТЬ'
-W ("  Play Защита: {0}" -f $(if ($set['Play Защита (проверка приложений)'] -eq '0') { 'ВЫКЛЮЧЕНА' } else { 'включена' }))
-W ("  Спецвозможности: {0}" -f $(if ($a11y -and $a11y -ne 'null') { $a11y } else { 'нет' }))
-W ("  Доступ к уведомлениям: {0}" -f $(if ($nls -and $nls -ne 'null') { $nls } else { 'нет' }))
-W ("  Администраторы устройства: {0}" -f $(if ($adminPkgs.Count) { $adminPkgs -join ', ' } else { 'нет' }))
+W (L 'm393')
+W ((L 'm394') -f $(if ($set['verifier'] -eq '0') { (L 'm395') } else { (L 'm396') }))
+W ((L 'm397') -f $(if ($a11y -and $a11y -ne 'null') { $a11y } else { (L 'm364') }))
+W ((L 'm398') -f $(if ($nls -and $nls -ne 'null') { $nls } else { (L 'm364') }))
+W ((L 'm399') -f $(if ($adminPkgs.Count) { $adminPkgs -join ', ' } else { (L 'm364') }))
 if ($owner) { W "  $owner" }
-W ("  Поверх других окон (сторонние): {0}" -f ((@($overlayPkgs | Where-Object { $third.Contains($_) })) -join ', '))
-W ("  Могут ставить приложения (сторонние): {0}" -f ((@($installPkgs | Where-Object { $third.Contains($_) })) -join ', '))
-W ("  Детский режим / Family Link: {0}" -f $(if ($kids) { 'да' } else { 'нет' }))
+W ((L 'm400') -f ((@($overlayPkgs | Where-Object { $third.Contains($_) })) -join ', '))
+W ((L 'm401') -f ((@($installPkgs | Where-Object { $third.Contains($_) })) -join ', '))
+W ((L 'm402') -f $(if ($kids) { (L 'm403') } else { (L 'm364') }))
 if ($susp.Count) {
-  W '  Сторонние приложения, на которые стоит посмотреть:'
-  foreach ($s in $susp) { W ("    [{0}] {1}{2} — {3}" -f $s.Level, $s.Pkg, $(if ($s.Used) { ' (пользуются)' } else { ' (не пользуются)' }), $s.Why) }
-  W '    ВНИМАНИЕ — показать владельцу и, если он не знает, что это, удалить обычным способом (или отключить из плана).'
-} else { W '  Подозрительных сторонних приложений не найдено.' }
+  W (L 'm404')
+  foreach ($s in $susp) { W ("    [{0}] {1}{2} — {3}" -f $(if ($s.Level -eq 'warn') { (L 'm405') } else { (L 'm406') }), $s.Pkg, $(if ($s.Used) { (L 'm407') } else { (L 'm408') }), $s.Why) }
+  W (L 'm409')
+} else { W (L 'm410') }
 W ''
-W '7. НАСТРОЙКИ И ПРИЛОЖЕНИЯ ПО УМОЛЧАНИЮ'
-foreach ($k in $set.Keys) { W ("  {0}: {1}" -f $k, $set[$k]) }
-W ("  Рабочий стол (HOME): {0}" -f $homeComp)
-foreach ($k in $roleShort.Keys) { W ("  Роль {0}: {1}" -f $k, $roleShort[$k]) }
-W ("  Сеть: {0}" -f $netType)
+W (L 'm411')
+foreach ($k in $set.Keys) { W ("  {0}: {1}" -f $setLabel[$k], $set[$k]) }
+W ((L 'm412') -f $homeComp)
+foreach ($k in $roleShort.Keys) { W ((L 'm413') -f $k, $roleShort[$k]) }
+W ((L 'm414') -f $netType)
 W ''
-W '8. НАБЛЮДЕНИЯ'
-if ($obs.Count) { foreach ($o in $obs) { W "  - $o" } } else { W '  Явных проблем не видно.' }
+W (L 'm415')
+if ($obs.Count) { foreach ($o in $obs) { W "  - $o" } } else { W (L 'm416') }
 W ''
-W '9. КАНДИДАТЫ НА ОТКЛЮЧЕНИЕ (база UAD-ng + наши правила; ничего не отключалось)'
-W '   Уровень: Recommended — безопасно почти всем, Advanced — по согласию. «спросить» — по умолчанию не отмечено.'
-W '   Колонка: auto — явный мусор (в плане отмечен), base — база считает безопасным (не отмечен), ask — спросить владельца.'
-foreach ($c in $candOk) { W ("  {0,-50} {1,-4} {2,-11} {3,4} МБ  {4}{5}" -f $c.Pkg, $c.Tier, $c.Removal, $c.Mb, $c.Note, $(if ($c.Ask) { "  [$($c.Ask)]" } else { '' })) }
+W (L 'm417')
+W (L 'm418')
+W (L 'm419')
+foreach ($c in $candOk) { W ((L 'm420') -f $c.Pkg, $c.Tier, $c.Removal, $c.Mb, $c.Note, $(if ($c.Ask) { "  [$($c.Ask)]" } else { '' })) }
 if ($candSkip) {
   W ''
-  W '   Есть в базе, но здесь НЕ трогать:'
+  W (L 'm421')
   foreach ($c in $candSkip) { W ("  {0,-50} {1}" -f $c.Pkg, $c.Skip) }
 }
 W ''
-W '10. ФОН: сторонние приложения, которые больше месяца не открывали, но они работают'
-if ($bgCands) { foreach ($b in $bgCands) { W ("  {0,-50} {1} МБ" -f $b.Pkg, $b.Mb) } } else { W '  Нет.' }
-if ($script:Notes.Count) { W ''; W 'ЗАМЕТКИ СКРИПТА'; foreach ($n in $script:Notes) { W "  - $n" } }
+W (L 'm422')
+if ($bgCands) { foreach ($b in $bgCands) { W ((L 'm423') -f $b.Pkg, $b.Mb) } } else { W (L 'm424') }
+if ($script:Notes.Count) { W ''; W (L 'm425'); foreach ($n in $script:Notes) { W "  - $n" } }
 W ''
-W 'Папка raw — исходные данные для разбора. MAC-адреса, серийные номера и IMEI скрыты; статистика использования — только сводка.'
+W (L 'm426')
 
 $repTxt = Join-Path $RepDir 'report.txt'
 $zip = $RepDir + '.zip'
@@ -1654,44 +1919,56 @@ function Save-Report([switch]$NoZip) {
         [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($za, $f.FullName, $rel)
       }
     } finally { $za.Dispose() }
-  } catch { Warn ('Архив не создан: ' + $_.Exception.Message) }
+  } catch { Warn ((L 'm427') + $_.Exception.Message) }
 }
 if ($Mode -eq 'opt') { Save-Report -NoZip } else { Save-Report }
 
+# Сводка для страницы
+$sumApps = @($topUsage | Select-Object -First 6 | ForEach-Object { [ordered]@{ pkg = $_.Pkg; min = [math]::Round($_.Sec / 60) } })
+Emit 'summary' ([ordered]@{
+  model = $model; brand = $brand; android = (P 'ro.build.version.release'); skin = $skin; type = $devType
+  dataPct = $dataPct; dataFreeMb = (Mb $dataFree); dataTotalMb = (Mb $dataTotal); cacheMb = $cacheMb
+  memAvailMb = (Mb $memAvail); memTotalMb = (Mb $memTotal); bat = $batLevel; batTemp = $batTemp
+  upDays = [math]::Floor($uptimeSec / 86400); obs = @($obs); apps = $sumApps
+  cand = $candOk.Count; candAuto = @($candOk | Where-Object { $_.Tier -eq 'auto' }).Count
+  susp = @($susp | Where-Object { $_.Level -eq 'warn' } | ForEach-Object { [ordered]@{ pkg = $_.Pkg; why = $_.Why } })
+})
 # Краткая сводка на экран
 Say ''
 Say ("{0} {1} — {2}, Android {3}{4}" -f $brand, $model, $devType, (P 'ro.build.version.release'), $(if ($skin) { ", $skin" } else { '' })) 'White'
-Say ("ОЗУ: доступно {0} из {1} МБ; память телефона занята на {2}%; батарея {3}%, {4} °C" -f (Mb $memAvail), (Mb $memTotal), $dataPct, $batLevel, $batTemp) 'White'
+Say ((L 'm428') -f (Mb $memAvail), (Mb $memTotal), $dataPct, $batLevel, $batTemp) 'White'
 if ($obs.Count) { foreach ($o in $obs) { Warn $o } }
-foreach ($s in @($susp | Where-Object { $_.Level -eq 'ВНИМАНИЕ' })) { Bad ("подозрительное: $($s.Pkg) — $($s.Why)") }
-Say ("Кандидатов на отключение: {0} (явный мусор, отмечается сам: {1}; можно по желанию: {2}; спросить владельца: {3}); фон: {4}" -f $candOk.Count, @($candOk | Where-Object { $_.Tier -eq 'auto' }).Count, @($candOk | Where-Object { $_.Tier -eq 'base' }).Count, @($candOk | Where-Object { $_.Tier -eq 'ask' }).Count, $bgCands.Count) 'White'
+foreach ($s in @($susp | Where-Object { $_.Level -eq 'warn' })) { Bad ((L 'm429' $($s.Pkg) $($s.Why))) }
+Say ((L 'm430') -f $candOk.Count, @($candOk | Where-Object { $_.Tier -eq 'auto' }).Count, @($candOk | Where-Object { $_.Tier -eq 'base' }).Count, @($candOk | Where-Object { $_.Tier -eq 'ask' }).Count, $bgCands.Count) 'White'
 
 if ($Mode -eq 'opt') {
   Say ''
-  Say '================ ДИАГНОСТИКА ГОТОВА — ДАЛЬШЕ ПЛАН ОПТИМИЗАЦИИ ================' 'Cyan'
-  Say '  Архив отчёта появится только в самом конце — после плана и проверки.' 'Cyan'
+  Say (L 'm431') 'Cyan'
+  Say (L 'm432') 'Cyan'
   Invoke-Optimization
   if ($script:OptLines.Count) {
     W ''
-    W '11. ОПТИМИЗАЦИЯ'
+    W (L 'm433')
     foreach ($t in $script:OptLines) { W "  - $t" }
-    if ($script:ChangeLog) { W '  Все команды записи с ответами телефона — changes.log; журнал для отката — backup/state.json' }
+    if ($script:ChangeLog) { W (L 'm434') }
   }
   Save-Report
 }
 
-Ok "Архив: $zip"
-Ok "Отчёт: $repTxt"
+Ok (L 'm435' $zip)
+Emit 'report' @{ zip = $zip; txt = $repTxt; mode = $Mode; journal = $(if ($script:Journal) { $script:Journal.Count } else { 0 }) }
+Emit 'stage' @{ s = 'done'; mode = $Mode }
+Ok (L 'm436' $repTxt)
 Say ''
-if ($Mode -ne 'opt') { Say 'Это была только ДИАГНОСТИКА — на телефоне ничего не отключено. Чтобы отключить — запусти снова и выбери 2 «Оптимизация».' 'Yellow' }
-Say 'Дальше:' 'Cyan'
-Say '  - Перетащи архив .zip к себе через AnyDesk (на свой ПК в C:\cleanmytv\reports) — Claude его разберёт.' 'Cyan'
+if ($Mode -ne 'opt') { Say (L 'm437') 'Yellow' }
+Say (L 'm438') 'Cyan'
+Say (L 'm439') 'Cyan'
 if ($Mode -eq 'opt' -and $script:Journal -and $script:Journal.Count) {
-  Say '  - Журнал для отката лежит в архиве (backup/state.json) и в папке backups набора — забери папку backups к себе.' 'Cyan'
+  Say (L 'm440') 'Cyan'
 }
-Say '  - На телефоне: выключить «Отладку по USB» / «Беспроводную отладку» (в Параметрах разработчика);' 'Cyan'
-Say '    Samsung — включить обратно «Автоблокировщик», если выключали.' 'Cyan'
-Say '  - Закончил у клиента: закрой окно (adb остановится) и удали папку phone-kit с его компьютера.' 'Cyan'
+Say (L 'm441') 'Cyan'
+Say (L 'm442') 'Cyan'
+Say (L 'm443') 'Cyan'
 if ($IsWin) {
   try { Start-Process notepad.exe -ArgumentList ('"' + $repTxt + '"') } catch {}
   try { Start-Process explorer.exe -ArgumentList ('/select,"' + $zip + '"') } catch {}

@@ -1,0 +1,128 @@
+package	note
+com.samsung.android.rubin.app	Samsung: servizio di personalizzazione (raccolta dati per i suggerimenti)
+com.samsung.android.mapsagent	Samsung: installa app «consigliate»
+com.samsung.android.app.omcagent	Samsung: installa app dell'operatore/partner
+com.samsung.android.ipsgeofence	Samsung Visit In: geofence per la pubblicità
+com.samsung.android.app.spage	Samsung Free: pannello a sinistra della Home
+com.samsung.android.app.tips	Samsung: «Suggerimenti»
+com.samsung.android.mateagent	Samsung: Galaxy Friends
+com.samsung.android.voc	Samsung Members (assistenza e diagnostica)
+com.samsung.android.bixby.agent	Bixby (assistente vocale)
+com.samsung.android.bixby.wakeup	Bixby: attivazione vocale
+com.samsung.android.bixbyvision.framework	Bixby Vision: riconoscimento testo in fotocamera e galleria
+com.samsung.android.visionintelligence	Bixby Vision
+com.samsung.android.arzone	Samsung AR Zone
+com.samsung.android.aremoji	Samsung AR Emoji
+com.samsung.android.ardrawing	Samsung AR Doodle
+com.samsung.android.livestickers	Samsung: sticker animati
+com.samsung.android.stickercenter	Samsung: centro sticker
+com.samsung.android.oneconnect	SmartThings (casa intelligente)
+com.samsung.android.beaconmanager	SmartThings: ricerca dispositivi vicini
+com.samsung.android.mdx	Collegamento a Windows
+com.microsoft.appmanager	Collegamento a Windows (Microsoft)
+com.sec.android.easyMover	Smart Switch (trasferimento dati)
+com.samsung.android.smartswitchassistant	Smart Switch: assistente
+com.samsung.android.app.watchmanagerstub	stub di Galaxy Watch (se non c'è l'orologio — si può)
+com.sec.android.app.shealth	Samsung Health
+com.samsung.android.app.reminder	Promemoria Samsung
+com.samsung.android.game.gamehome	Game Launcher
+com.samsung.android.fmm	Trova dispositivo personale (protezione dal furto)
+com.sec.spp.push	notifiche push Samsung (ne dipende «Trova dispositivo personale»)
+com.samsung.android.scloud	Samsung Cloud (backup)
+com.samsung.android.sm.devicesecurity	antivirus in «Assistenza dispositivo»
+com.samsung.android.dqagent	Samsung: agente di diagnostica qualità
+com.samsung.android.app.cocktailbarservice	pannelli Edge (sul tablet può rompere lo schermo diviso)
+com.samsung.android.app.appsedge	pannello Edge «App»
+com.samsung.android.app.taskedge	pannello Edge «Attività»
+com.samsung.android.smartmirroring	Smart View (trasmissione sulla TV)
+com.samsung.android.app.sharelive	Quick Share (condivisione file)
+com.samsung.android.da.daagent	Dual Messenger (le seconde copie delle app di messaggistica spariranno)
+com.samsung.android.samsungpass	Samsung Pass (password)
+com.samsung.android.themestore	Galaxy Themes (il tema può resettarsi)
+com.sec.android.app.sbrowser	Samsung Internet
+com.samsung.android.game.gos	Game Optimizing Service: prestazioni e temperatura nei giochi
+com.samsung.android.kgclient	CRITICO: blocca il telefono se disattivato
+com.samsung.android.smartsuggestions	suggerimenti One UI (conseguenze poco chiare)
+com.samsung.android.app.routines	Modalità e routine
+com.samsung.android.lool	Assistenza dispositivo
+com.osp.app.signin	Samsung Account (senza, le Impostazioni si bloccano)
+com.samsung.android.scs	Samsung Core Services
+com.samsung.android.mobileservice	Samsung: servizi dell'account
+com.sec.android.app.samsungapps	Galaxy Store (aggiorna le app di sistema Samsung)
+com.wssyncmldm	aggiornamento software Samsung
+com.sec.android.soagent	aggiornamento software Samsung
+com.samsung.android.app.aodservice	Always On Display
+com.sec.android.diagmonagent	diagnostica Samsung (il sistema la riavvia)
+com.samsung.android.dsms	diagnostica Samsung (il sistema la riavvia)
+com.facebook.appmanager	Facebook preinstallato: gestore aggiornamenti (l'app resta)
+com.facebook.services	Facebook preinstallato: servizi
+com.facebook.system	Facebook preinstallato: installer
+com.netflix.partner.activation	stub partner di Netflix
+com.microsoft.skydrive	OneDrive
+com.microsoft.office.officehubrow	Microsoft Office
+com.linkedin.android	LinkedIn
+com.miui.msa.global	Xiaomi: pubblicità di sistema (MSA)
+com.miui.analytics	Xiaomi: analisi dati
+com.miui.daemon	Xiaomi: raccolta dati
+com.miui.hybrid	Xiaomi: «App rapide» (pubblicità)
+com.miui.hybrid.accessory	Xiaomi: «App rapide»
+com.miui.yellowpage	Xiaomi: Pagine gialle
+com.xiaomi.glgm	Xiaomi: centro giochi
+com.miui.bugreport	Xiaomi: segnalazione errori
+com.miui.contentextension	Xiaomi Taplus: suggerimenti sul testo selezionato
+com.miui.android.fashiongallery	Xiaomi: «Carosello sfondi» (pubblicità sulla schermata di blocco)
+com.xiaomi.mipicks	Xiaomi GetApps (store con pubblicità)
+com.mi.globalminusscreen	Xiaomi: pannello App Vault a sinistra della Home
+com.miui.personalassistant	Xiaomi: pannello App Vault
+com.miui.cleaner	Xiaomi: Pulizia (parte di «Sicurezza»)
+com.miui.guardprovider	Xiaomi: antivirus di «Sicurezza»
+com.miui.cloudservice	Mi Cloud
+com.miui.cloudbackup	Mi Cloud: backup
+com.miui.micloudsync	Mi Cloud: sincronizzazione
+com.android.thememanager	Xiaomi Temi (sfondi e icone possono resettarsi)
+com.miui.player	Xiaomi Musica
+com.miui.videoplayer	Xiaomi Video
+com.mi.globalbrowser	Mi Browser
+com.android.browser	browser del produttore
+com.miui.notes	Xiaomi Note
+com.miui.compass	Bussola
+com.miui.weather2	Meteo Xiaomi
+com.miui.calculator	Calcolatrice
+com.miui.fm	Radio
+com.xiaomi.midrop	ShareMe
+com.miui.mishare.connectivity	Mi Share
+com.xiaomi.scanner	Scanner
+com.mi.health	Mi Health
+com.xiaomi.payment	Mi Pay
+com.mipay.wallet	Mi Pay
+com.miui.voiceassist	assistente vocale Xiaomi
+com.miui.virtualsim	SIM virtuale Xiaomi
+com.miui.miservice	Xiaomi: servizi e feedback
+com.miui.huanji	Mi Mover (trasferimento dati)
+com.xiaomi.joyose	Xiaomi: gestione termica e prestazioni nei giochi
+com.miui.powerkeeper	Xiaomi: gestione batteria
+com.miui.securitycenter	Xiaomi «Sicurezza» (rompe il sistema)
+com.lbe.security.miui	Xiaomi: gestione autorizzazioni
+com.xiaomi.finddevice	Xiaomi: Trova dispositivo
+com.xiaomi.account	Account Mi
+com.xiaomi.xmsf	Xiaomi: servizio push (notifiche, Trova dispositivo)
+com.miui.miwallpaper	Xiaomi: sfondi
+com.miui.securitycore	Xiaomi: secondo spazio e blocco app
+com.miui.securityadd	Xiaomi: parte di «Sicurezza»
+com.xiaomi.discover	Xiaomi: aggiornamento app di sistema
+com.google.android.apps.turbo	Device Health Services (rompe le impostazioni della batteria)
+com.google.android.apps.wellbeing	Benessere digitale (serve per il controllo genitori)
+com.google.android.youtube	YouTube
+com.google.android.apps.youtube.music	YouTube Music
+com.google.android.videos	Google TV (film)
+com.google.android.apps.tachyon	Google Meet
+com.google.android.apps.docs	Google Drive
+com.google.android.apps.maps	Google Maps
+com.google.android.gm	Gmail
+com.google.android.apps.photos	Google Foto
+com.google.android.feedback	Google: invio feedback
+com.google.android.marvin.talkback	TalkBack (per ipovedenti)
+com.google.android.googlequicksearchbox	app Google (ricerca, «Ok Google»)
+com.google.android.as	Android System Intelligence (suggerimenti intelligenti)
+com.google.android.apps.subscriptions.red	Google One
+com.google.android.projection.gearhead	Android Auto
