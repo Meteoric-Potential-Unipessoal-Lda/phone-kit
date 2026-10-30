@@ -11,6 +11,9 @@
 ОДИН РАЗ У СЕБЯ
   prepare.bat — кладёт в tools\ ADB для Windows и Mac и PowerShell для Mac
   (если рядом лежит папка tv-kit — берёт всё оттуда, ничего не качая).
+  Без prepare.bat тоже работает: на Windows при первом запуске набор сам скачает ADB (нужен интернет).
+  Mac без Windows: один раз в Терминале  brew install powershell android-platform-tools  (https://brew.sh)
+  Свежая версия: https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest
 
 У КЛИЕНТА
   1. Спросить клиента: чем пользуется (Bixby, Samsung Pay, Smart View, Mi Cloud, «Найти устройство»,

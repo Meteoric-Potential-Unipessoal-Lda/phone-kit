@@ -1,5 +1,7 @@
 # phone-kit
 
+**Download:** [latest release](https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest) · Windows: unzip → `start.bat` · Mac: `brew install powershell android-platform-tools` → `bash start.command`
+
 **EN** · A repair technician's tool that safely cleans up and speeds up Android phones and tablets over ADB: Samsung, Xiaomi / Redmi / Poco, Realme / OPPO, Honor / Huawei, Motorola, Pixel and others. Runs on Windows or Mac, opens a local page in the browser (works offline); the phone connects by USB cable or by Wi-Fi pairing code (Android 11+). Rule number one is **do no harm**: read-only diagnostics first, then a plan with checkboxes, changes only after you confirm, in batches with checks, everything reversible and logged for one-click rollback.
 
 Interface languages: Русский, Українська, English, Português, Español, Français, Italiano, Deutsch, Latviešu, Polski.
@@ -17,8 +19,9 @@ Interface languages: Русский, Українська, English, Português, 
 
 ## Как пользоваться / How to use
 
-1. Скачать репозиторий (Code → Download ZIP) и распаковать в папку `phone-kit`.
-2. Один раз запустить `prepare.bat` (Windows): скачает в `tools\` ADB для Windows и Mac, PowerShell для Mac и драйвер Google USB.
+1. Скачать последнюю версию: [Releases](https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest) → `phone-kit-<версия>.zip` (или Code → Download ZIP) и распаковать.
+2. Windows: можно сразу запускать — при первом запуске набор сам скачает ADB с сайта Google (нужен интернет). Чтобы набор работал и без интернета, а также для Mac-клиентов — один раз запустить `prepare.bat`: скачает в `tools\` ADB для Windows и Mac, PowerShell для Mac и драйвер Google USB.
+   Mac без Windows: один раз в Терминале `brew install powershell android-platform-tools` ([Homebrew](https://brew.sh)).
 3. На телефоне включить режим разработчика и «Отладку по USB» (или «Беспроводную отладку»).
 4. Windows: `start.bat`. Mac: в Терминале `bash ~/Desktop/phone-kit/start.command`. Откроется страница в браузере; окно консоли остаётся — отвечать можно и там.
 5. Выбрать: **Диагностика**, **Оптимизация** или **Откат**.
