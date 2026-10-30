@@ -21,13 +21,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Кодировки (BOM + CRLF, .bat — ASCII, start.command — LF)
         shell: powershell
+        # Встроенный код раннер сохраняет без BOM, PowerShell 5.1 читает его как ANSI — только латиница.
         run: |
           $b = [IO.File]::ReadAllBytes("$PWD\phonekit.ps1")
-          if ($b[0] -ne 0xEF -or $b[1] -ne 0xBB -or $b[2] -ne 0xBF) { throw 'phonekit.ps1: нет BOM' }
+          if ($b[0] -ne 0xEF -or $b[1] -ne 0xBB -or $b[2] -ne 0xBF) { throw 'phonekit.ps1: no UTF-8 BOM' }
           $t = [IO.File]::ReadAllText("$PWD\phonekit.ps1")
-          if (($t -replace "`r`n", '') -match "`n") { throw 'phonekit.ps1: строки не CRLF' }
-          foreach ($f in 'start.bat', 'prepare.bat') { if ([IO.File]::ReadAllBytes("$PWD\$f") | Where-Object { $_ -gt 127 }) { throw "${f}: не ASCII" } }
-          if ([IO.File]::ReadAllText("$PWD\start.command") -match "`r") { throw 'start.command: должен быть LF' }
+          if (($t -replace "`r`n", '') -match "`n") { throw 'phonekit.ps1: line endings must be CRLF' }
+          foreach ($f in 'start.bat', 'prepare.bat') { if ([IO.File]::ReadAllBytes("$PWD\$f") | Where-Object { $_ -gt 127 }) { throw "${f}: must be ASCII" } }
+          if ([IO.File]::ReadAllText("$PWD\start.command") -match "`r") { throw 'start.command: line endings must be LF' }
           'ok'
       - name: Разбор phonekit.ps1 в Windows PowerShell 5.1
         shell: powershell
