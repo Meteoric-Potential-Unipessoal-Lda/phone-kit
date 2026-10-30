@@ -32,7 +32,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '0.7'
+$KitVersion = '0.8'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -860,17 +860,49 @@ function Invoke-RebootCheck {
   $o = ShW 'svc power reboot' 20
   if ($o -match 'Unknown|not found|Error') { [void](ShW 'reboot' 20) }
   Say '  Телефон перезагружается, жду до 5 минут...'
-  if ($wifi) { Say '  По Wi-Fi: после загрузки разблокируй телефон; если «Беспроводная отладка» выключилась — включи снова.' 'Yellow' }
+  if ($wifi) { Say '  По Wi-Fi: после загрузки разблокируй телефон и включи «Беспроводную отладку» снова (Xiaomi и многие другие её выключают).' 'Yellow' }
   else { Say '  После загрузки разблокируй телефон (если спросит PIN).' 'Yellow' }
   Start-Sleep -Seconds 30
-  $up = $false; $seen = $false
-  for ($i = 0; $i -lt 27; $i++) {
-    if ($wifi) { foreach ($m in (Get-Mdns | Where-Object { $_.Kind -eq 'connect' })) { [void](Invoke-Adb @('connect', $m.Addr) 10) } }
+  $up = $false; $seen = $false; $hinted = $false; $tried = @{}; $ext = 0
+  $tries = $(if ($wifi) { 45 } else { 27 })   # по Wi-Fi нужен человек: включить отладку и, возможно, ввести код
+  for ($i = 0; $i -lt $tries; $i++) {
+    if ($wifi -and -not $seen -and $i -eq $tries - 1) {
+      $more = ([string](Read-Host '  Телефон по Wi-Fi ещё не подключился. Подождать ещё? (Enter — ждать дальше, Q — закончить)')).Trim()
+      if ($more -notmatch '^[QqЙй]$' -and $ext -lt 6) { $ext++; $tries += 30 }
+    }
+    $ms = @()
+    if ($wifi) {
+      $ms = @(Get-Mdns)
+      foreach ($m in ($ms | Where-Object { $_.Kind -eq 'connect' })) { [void](Invoke-Adb @('connect', $m.Addr) 10) }
+    }
     $s = Find-SameDevice $sn
     if ($s) {
       $seen = $true
       $script:Serial = $s
       if ((Sh 'getprop sys.boot_completed').Trim() -eq '1') { $up = $true; break }
+    }
+    if ($wifi -and -not $seen) {
+      if (-not $hinted -and $i -ge 3) {
+        $hinted = $true
+        Say ''
+        Say '  Телефон по Wi-Fi пока не виден — после перезагрузки «Беспроводная отладка» выключилась. Это нормально:' 'Yellow'
+        Say '   1) разблокируй телефон -> Параметры разработчика -> снова включи «Беспроводная отладка»;' 'Yellow'
+        Say '   2) не подключился за 20 секунд — нажми «Подключить устройство по коду»: набор сам найдёт окно и спросит 6 цифр.' 'Yellow'
+        Say '   Удалять компьютер из списка сопряжённых НЕ нужно. Набор ждёт 7 минут, потом спросит, ждать ли ещё.' 'Yellow'
+      }
+      $pw = @($ms | Where-Object { $_.Kind -eq 'pairing' -and -not $tried.ContainsKey($_.Addr) }) | Select-Object -First 1
+      if ($pw) {
+        $tried[$pw.Addr] = 1
+        Ok "вижу окно сопряжения на телефоне: $($pw.Addr)"
+        $code = ([string](Read-Host '  Код из 6 цифр с экрана телефона (Enter — пропустить)')).Trim()
+        if ($code -match '^\d{6}$') {
+          $r = Invoke-Adb @('pair', $pw.Addr, $code) 30
+          $txt = ($r.Out + ' ' + $r.Err).Trim()
+          if ($txt -match 'Successfully paired') { Ok 'Сопряжение прошло, подключаюсь...' }
+          else { Warn "Сопряжение не прошло: $txt — открой «Подключить устройство по коду» ещё раз (новый код)." }
+        }
+        continue
+      }
     }
     Start-Sleep -Seconds 10
   }
@@ -881,7 +913,7 @@ function Invoke-RebootCheck {
       Say '  Если не поможет: подождать 10 минут, принудительная перезагрузка (питание + громкость вниз 10-15 с), потом снова пункт 3 «Откат». Сброс к заводским НЕ делать.' 'Yellow'
     } else {
       if ($wifi) {
-        OptLog 'телефон не вернулся по Wi-Fi за 5 минут. Обычно это нормально: после перезагрузки Xiaomi и многие другие сами выключают «Беспроводную отладку». Если телефон загрузился и работает — изменения сохранены. Проверить: включи «Беспроводную отладку», запусти набор, пункт 1 — отключённое будет в «Уже отключены».' 'warn'
+        OptLog 'телефон не вернулся по Wi-Fi за 7 минут. Обычно это нормально: после перезагрузки Xiaomi и многие другие сами выключают «Беспроводную отладку». Если телефон загрузился и работает — изменения сохранены. Проверить: включи «Беспроводную отладку», запусти набор, пункт 1 — отключённое будет в «Уже отключены».' 'warn'
       } else {
         OptLog 'телефон не вернулся в ADB за 5 минут. Проверь экран телефона: если загрузился — включи отладку снова, запусти набор и сделай диагностику (пункт 1) или откат (пункт 3).' 'warn'
       }
@@ -911,7 +943,7 @@ function Invoke-Optimization {
   if ($animNow -notin @('0.5', '0.5f', '0', '0.0')) { AddItem 'anim' '' "Анимации интерфейса -> 0.5x (сейчас $(if ($animNow -and $animNow -ne 'null') { $animNow } else { '1x' }))" $true 'Настройки' }
   if ($set['Частный DNS (режим)'] -ne 'hostname') {
     if ($kids) { AddItem 'dns' 'family.adguard-dns.com' 'Частный DNS AdGuard «Семейный»: режет рекламу и взрослые сайты (family.adguard-dns.com) — по желанию родителей' $false 'Настройки' }
-    else { AddItem 'dns' 'dns.adguard-dns.com' 'Частный DNS AdGuard: режет рекламу в приложениях и браузере (dns.adguard-dns.com) — по желанию клиента' $false 'Настройки' }
+    else { AddItem 'dns' 'dns.adguard-dns.com' 'Частный DNS AdGuard: режет рекламу в приложениях и браузере, на сайтах с фильмами — большую часть (dns.adguard-dns.com) — по желанию клиента' $false 'Настройки' }
   }
   $cacheTxt = 'Очистить кэш всех приложений'
   if ($cacheMb -gt 0) { $cacheTxt += " (~$cacheMb МБ)" }
@@ -939,10 +971,11 @@ function Invoke-Optimization {
     for ($i = 0; $i -lt $items.Count; $i++) {
       $it = $items[$i]
       if ($it.Group -ne $g) { $g = $it.Group; Say ("  --- $g ---") 'Cyan' }
-      if ($it.On) { Say ("  [x] {0,2}. {1}" -f ($i + 1), $it.Text) 'White' } else { Say ("  [ ] {0,2}. {1}" -f ($i + 1), $it.Text) 'DarkGray' }
+      if ($it.On) { Say ("  [x] {0,2}. {1}" -f ($i + 1), $it.Text) 'Green' } else { Say ("  [ ] {0,2}. {1}" -f ($i + 1), $it.Text) 'Gray' }
     }
     Say ''
     Say '[x] — уже выбрано, будет сделано. Чтобы выполнить отмеченное — просто Enter.' 'Green'
+    Say '[ ] — не выбрано, но ДОСТУПНО: введи номер, чтобы включить (например, DNS против рекламы).' 'Gray'
     Say 'Номер (через пробел, можно 5-12) ПЕРЕКЛЮЧАЕТ галочку: у отмеченного снимает, у пустого ставит.' 'Cyan'
     Say 'B — отметить все «база: можно»; A — всё; 0 — снять всё; Q — выйти без изменений' 'Cyan'
     $a = ([string](Read-Host 'Ввод (Enter — выполнить отмеченное)')).Trim()
