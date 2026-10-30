@@ -41,3 +41,6 @@ jobs:
       - name: Пункт U (кабель) на подставных данных
         shell: powershell
         run: .\tests\usbtest.ps1
+      - name: Веб-интерфейс в Windows PowerShell 5.1
+        shell: pwsh
+        run: python tests/webtest.py powershell
