@@ -1,0 +1,128 @@
+package	level	note
+com.samsung.android.rubin.app	ok	Samsung: сервис персонализации (сбор данных для рекомендаций)
+com.samsung.android.mapsagent	ok	Samsung: доустанавливает «рекомендованные» приложения
+com.samsung.android.app.omcagent	ok	Samsung: доустанавливает приложения оператора/партнёров
+com.samsung.android.ipsgeofence	ok	Samsung Visit In: геозоны для рекламы
+com.samsung.android.app.spage	ok	Samsung Free: лента слева на рабочем столе
+com.samsung.android.app.tips	ok	Samsung: «Советы»
+com.samsung.android.mateagent	ok	Samsung: Galaxy Friends
+com.samsung.android.voc	ask	Samsung Members (поддержка и диагностика)
+com.samsung.android.bixby.agent	ask	Bixby (голосовой помощник)
+com.samsung.android.bixby.wakeup	ask	Bixby: пробуждение голосом
+com.samsung.android.bixbyvision.framework	ask	Bixby Vision: распознавание текста в камере и галерее
+com.samsung.android.visionintelligence	ask	Bixby Vision
+com.samsung.android.arzone	ok	Samsung AR Zone
+com.samsung.android.aremoji	ok	Samsung AR-эмодзи
+com.samsung.android.ardrawing	ok	Samsung AR-рисование
+com.samsung.android.livestickers	ok	Samsung: живые стикеры
+com.samsung.android.stickercenter	ok	Samsung: центр стикеров
+com.samsung.android.oneconnect	ask	SmartThings (умный дом)
+com.samsung.android.beaconmanager	ok	SmartThings: поиск устройств рядом
+com.samsung.android.mdx	ask	Связь с Windows
+com.microsoft.appmanager	ask	Связь с Windows (Microsoft)
+com.sec.android.easyMover	ask	Smart Switch (перенос данных)
+com.samsung.android.smartswitchassistant	ask	Smart Switch: помощник
+com.samsung.android.app.watchmanagerstub	ask	заглушка Galaxy Watch (если часов нет — можно)
+com.sec.android.app.shealth	ask	Samsung Health
+com.samsung.android.app.reminder	ask	Напоминания Samsung
+com.samsung.android.game.gamehome	ask	Game Launcher
+com.samsung.android.fmm	ask	Найти устройство (защита от кражи)
+com.sec.spp.push	ask	push-уведомления Samsung (от них зависит «Найти устройство»)
+com.samsung.android.scloud	ask	Samsung Cloud (резервные копии)
+com.samsung.android.sm.devicesecurity	ask	антивирус в «Обслуживании устройства»
+com.samsung.android.dqagent	ask	Samsung: агент диагностики качества
+com.samsung.android.app.cocktailbarservice	ask	панели Edge (на планшете может сломать разделение экрана)
+com.samsung.android.app.appsedge	ask	панель Edge «Приложения»
+com.samsung.android.app.taskedge	ask	панель Edge «Задачи»
+com.samsung.android.smartmirroring	ask	Smart View (трансляция на ТВ)
+com.samsung.android.app.sharelive	ask	Quick Share (обмен файлами)
+com.samsung.android.da.daagent	ask	Dual Messenger (вторые копии мессенджеров пропадут)
+com.samsung.android.samsungpass	ask	Samsung Pass (пароли)
+com.samsung.android.themestore	ask	Galaxy Themes (тема может сброситься)
+com.sec.android.app.sbrowser	ask	Samsung Internet
+com.samsung.android.game.gos	protect	Game Optimizing Service: производительность и нагрев в играх
+com.samsung.android.kgclient	protect	КРИТИЧНО: блокирует телефон при отключении
+com.samsung.android.smartsuggestions	protect	подсказки One UI (последствия неясны)
+com.samsung.android.app.routines	protect	Режимы и процедуры
+com.samsung.android.lool	protect	Обслуживание устройства
+com.osp.app.signin	protect	Samsung Account (без него падают Настройки)
+com.samsung.android.scs	protect	Samsung Core Services
+com.samsung.android.mobileservice	protect	Samsung: сервисы аккаунта
+com.sec.android.app.samsungapps	protect	Galaxy Store (обновляет системные приложения Samsung)
+com.wssyncmldm	protect	обновление ПО Samsung
+com.sec.android.soagent	protect	обновление ПО Samsung
+com.samsung.android.app.aodservice	protect	Always On Display
+com.sec.android.diagmonagent	protect	диагностика Samsung (система перезапускает)
+com.samsung.android.dsms	protect	диагностика Samsung (система перезапускает)
+com.facebook.appmanager	ok	предустановленный Facebook: менеджер обновлений (само приложение останется)
+com.facebook.services	ok	предустановленный Facebook: службы
+com.facebook.system	ok	предустановленный Facebook: установщик
+com.netflix.partner.activation	ok	партнёрская заглушка Netflix
+com.microsoft.skydrive	ask	OneDrive
+com.microsoft.office.officehubrow	ask	Microsoft Office
+com.linkedin.android	ask	LinkedIn
+com.miui.msa.global	ok	Xiaomi: реклама в системе (MSA)
+com.miui.analytics	ok	Xiaomi: аналитика
+com.miui.daemon	ok	Xiaomi: сбор данных
+com.miui.hybrid	ok	Xiaomi: «Быстрые приложения» (реклама)
+com.miui.hybrid.accessory	ok	Xiaomi: «Быстрые приложения»
+com.miui.yellowpage	ok	Xiaomi: Жёлтые страницы
+com.xiaomi.glgm	ok	Xiaomi: игровой центр
+com.miui.bugreport	ok	Xiaomi: отчёты об ошибках
+com.miui.contentextension	ok	Xiaomi Taplus: подсказки по выделенному тексту
+com.miui.android.fashiongallery	ok	Xiaomi: «Карусель обоев» (реклама на экране блокировки)
+com.xiaomi.mipicks	ask	Xiaomi GetApps (магазин с рекламой)
+com.mi.globalminusscreen	ask	Xiaomi: лента App Vault слева на рабочем столе
+com.miui.personalassistant	ask	Xiaomi: лента App Vault
+com.miui.cleaner	ask	Xiaomi: Очистка (часть «Безопасности»)
+com.miui.guardprovider	ask	Xiaomi: антивирус «Безопасности»
+com.miui.cloudservice	ask	Mi Cloud
+com.miui.cloudbackup	ask	Mi Cloud: резервные копии
+com.miui.micloudsync	ask	Mi Cloud: синхронизация
+com.android.thememanager	ask	Xiaomi Темы (обои и значки могут сброситься)
+com.miui.player	ask	Xiaomi Музыка
+com.miui.videoplayer	ask	Xiaomi Видео
+com.mi.globalbrowser	ask	Mi Браузер
+com.android.browser	ask	браузер производителя
+com.miui.notes	ask	Xiaomi Заметки
+com.miui.compass	ask	Компас
+com.miui.weather2	ask	Погода Xiaomi
+com.miui.calculator	ask	Калькулятор
+com.miui.fm	ask	Радио
+com.xiaomi.midrop	ask	ShareMe
+com.miui.mishare.connectivity	ask	Mi Share
+com.xiaomi.scanner	ask	Сканер
+com.mi.health	ask	Mi Health
+com.xiaomi.payment	ask	Mi Pay
+com.mipay.wallet	ask	Mi Pay
+com.miui.voiceassist	ask	голосовой помощник Xiaomi
+com.miui.virtualsim	ask	виртуальная SIM Xiaomi
+com.miui.miservice	ask	Xiaomi: сервисы и обратная связь
+com.miui.huanji	ask	Mi Mover (перенос данных)
+com.xiaomi.joyose	protect	Xiaomi: тепловой режим и производительность в играх
+com.miui.powerkeeper	protect	Xiaomi: управление батареей
+com.miui.securitycenter	protect	Xiaomi «Безопасность» (ломает систему)
+com.lbe.security.miui	protect	Xiaomi: менеджер разрешений
+com.xiaomi.finddevice	protect	Xiaomi: Найти устройство
+com.xiaomi.account	protect	Mi аккаунт
+com.xiaomi.xmsf	protect	Xiaomi: push-сервис (уведомления, Найти устройство)
+com.miui.miwallpaper	protect	Xiaomi: обои
+com.miui.securitycore	protect	Xiaomi: второе пространство и защита приложений
+com.miui.securityadd	protect	Xiaomi: часть «Безопасности»
+com.xiaomi.discover	protect	Xiaomi: обновление системных приложений
+com.google.android.apps.turbo	protect	Device Health Services (ломает настройки батареи)
+com.google.android.apps.wellbeing	protect	Цифровое благополучие (нужно для родительского контроля)
+com.google.android.youtube	ask	YouTube
+com.google.android.apps.youtube.music	ask	YouTube Music
+com.google.android.videos	ask	Google TV (фильмы)
+com.google.android.apps.tachyon	ask	Google Meet
+com.google.android.apps.docs	ask	Google Диск
+com.google.android.apps.maps	ask	Google Карты
+com.google.android.gm	ask	Gmail
+com.google.android.apps.photos	ask	Google Фото
+com.google.android.feedback	ok	Google: отправка отзывов
+com.google.android.marvin.talkback	ask	TalkBack (для слабовидящих)
+com.google.android.googlequicksearchbox	ask	приложение Google (поиск, «Окей, Google»)
+com.google.android.as	ask	Android System Intelligence (умные подсказки)
+com.google.android.apps.subscriptions.red	ask	Google One
+com.google.android.projection.gearhead	ask	Android Auto
