@@ -38,7 +38,8 @@ foreach ($k in $cases.Keys) {
   if ($ok) { [Console]::WriteLine("PASS usb:$k") } else { [Console]::WriteLine("FAIL usb:$k`n$txt"); $fail++ }
 }
 # Windows 7/8: Get-PnpDevice нет — те же случаи через Win32_PnPEntity
-Remove-Item Function:\Get-PnpDevice -ErrorAction SilentlyContinue
+# (на Windows-раннере настоящий Get-PnpDevice есть, поэтому подменяем его ошибкой — набор должен уйти в WMI)
+function Get-PnpDevice { param([switch]$PresentOnly) throw 'Get-PnpDevice недоступен' }
 function W($n, $err, $cls, $guid, $id) { [pscustomobject]@{ Name = $n; ConfigManagerErrorCode = $err; PNPClass = $cls; ClassGuid = $guid; DeviceID = $id; Service = '' } }
 $wcases = [ordered]@{
   'wmi_nodrv' = @{ devs = @((W 'ADB Interface' 28 '' '' 'USB\VID_2717&PID_FF48&MI_01\x'), (W 'USB Mouse' 0 'Mouse' '' 'USB\VID_046D&PID_C077\x')); expect = 'Установить с диска' }
