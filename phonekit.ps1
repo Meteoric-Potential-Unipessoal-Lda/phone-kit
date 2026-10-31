@@ -47,7 +47,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '1.1.1'
+$script:BoundArgs = @{}; foreach ($k in $PSBoundParameters.Keys) { $script:BoundArgs[$k] = $PSBoundParameters[$k] }
+$script:UpdateInfo = $null
+$KitVersion = '1.2'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -190,7 +192,7 @@ $WebServer = {
         try {
           $evs = New-Object System.Collections.ArrayList
           foreach ($e in $W.events) { if ($e.seq -gt $since) { [void]$evs.Add($e) } }
-          $resp = [ordered]@{ seq = $W.seq; events = $evs.ToArray(); question = $W.question; lang = $W.lang; finished = [bool]$W.finished; kit = $W.kit }
+          $resp = [ordered]@{ seq = $W.seq; events = $evs.ToArray(); question = $W.question; lang = $W.lang; finished = [bool]$W.finished; kit = $W.kit; boot = $W.boot }
         } finally { [System.Threading.Monitor]::Exit($W.SyncRoot) }
         SendText $c 200 'application/json; charset=utf-8' ($resp | ConvertTo-Json -Depth 10 -Compress); continue
       }
@@ -244,12 +246,17 @@ function Start-Web {
   $html = [IO.File]::ReadAllText($uiFile, [Text.Encoding]::UTF8)
   $chars = 'abcdefghijkmnpqrstuvwxyz23456789'.ToCharArray()
   $token = -join (1..20 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
+  # после самообновления: тот же адрес (порт и ключ), чтобы открытая вкладка сама подхватила новую версию
+  $reusePort = 0
+  if ($env:PHONEKIT_WEBTOKEN -match '^[a-z0-9]{20}$' -and $env:PHONEKIT_WEBPORT -match '^\d{4,5}$') { $token = $env:PHONEKIT_WEBTOKEN; $reusePort = [int]$env:PHONEKIT_WEBPORT }
+  $env:PHONEKIT_WEBTOKEN = $null; $env:PHONEKIT_WEBPORT = $null
   $listener = $null; $port = 0
-  foreach ($p in (8731..8760)) {
+  $ports = @(8731..8760); if ($reusePort) { $ports = @($reusePort) + $ports }
+  foreach ($p in $ports) {
     try { $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $p); $l.Start(); $listener = $l; $port = $p; break } catch {}
   }
   if (-not $listener) { return $false }
-  $w = [hashtable]::Synchronized(@{ events = (New-Object System.Collections.ArrayList); seq = 0; question = $null; answer = $null; lang = $script:Lang; langReq = $null; stop = $false; finished = $false; closeReq = $false; kit = $KitVersion })
+  $w = [hashtable]::Synchronized(@{ events = (New-Object System.Collections.ArrayList); seq = 0; question = $null; answer = $null; lang = $script:Lang; langReq = $null; stop = $false; finished = $false; closeReq = $false; kit = $KitVersion; boot = [guid]::NewGuid().ToString('N').Substring(0, 8) })
   $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
   $ps = [powershell]::Create(); $ps.Runspace = $rs
   [void]$ps.AddScript($WebServer).AddArgument($w).AddArgument($listener).AddArgument($html).AddArgument((Join-Path (Join-Path $Root 'data') 'lang')).AddArgument($token)
@@ -258,7 +265,7 @@ function Start-Web {
   $script:WebUrl = "http://127.0.0.1:$port/?t=$token"
   Say (L 'w001' $script:WebUrl) 'Cyan'
   Say (L 'w002') 'DarkGray'
-  if (-not $NoBrowser) {
+  if (-not $NoBrowser -and -not ($reusePort -and $port -eq $reusePort)) {
     try {
       if ($IsWin) {
         $br = Find-Browser
@@ -1883,6 +1890,89 @@ function Save-Raw2([string]$dir, [string]$name, [string]$txt) {
   try { [IO.File]::WriteAllText((Join-Path $dir $name), $txt, (New-Object Text.UTF8Encoding($false))) } catch {}
 }
 
+# ----------------------------------------------------------------- самообновление (кнопка «Обновить»)
+# Скачивает архив релиза, сверяет SHA-256 из описания релиза, заменяет файлы набора (tools, reports, backups не трогает;
+# заменяемые файлы сначала копируются в backups/kit-<старая версия>) и перезапускает набор новой версией.
+function Get-FileSha256([string]$path) {
+  $fs = [IO.File]::OpenRead($path)
+  try { $h = [Security.Cryptography.SHA256]::Create().ComputeHash($fs) } finally { $fs.Dispose() }
+  return (-join ($h | ForEach-Object { $_.ToString('x2') }))
+}
+function Invoke-SelfUpdate {
+  $u = $script:UpdateInfo
+  Title (L 'u011' $u.version)
+  Emit 'update' @{ version = $u.version; url = $u.url; canUpdate = $true; state = 'downloading' }
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) ('phone-kit-update-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+  $zip = Join-Path $tmp 'update.zip'
+  $fail = {
+    param($msg)
+    Bad (L 'u012' $msg); Say (L 'u013' $u.url)
+    Emit 'update' @{ version = $u.version; url = $u.url; canUpdate = $true; state = 'failed'; msg = [string]$msg }
+    try { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue } catch {}
+  }
+  try {
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+    Say (L 'u014')
+    Save-Url $u.zip $zip
+    $got = Get-FileSha256 $zip
+    if ($got -ne $u.sha) { & $fail (L 'u015' $got); return }
+    Ok (L 'u016')
+    $ex = Join-Path $tmp 'x'
+    Expand-Zip $zip $ex
+    $src = Join-Path $ex 'phone-kit'
+    $newPs = Join-Path $src 'phonekit.ps1'
+    if (-not (Test-Path -LiteralPath $newPs)) { & $fail 'phonekit.ps1?'; return }
+    $nvTxt = [IO.File]::ReadAllText($newPs)
+    if ($nvTxt -notmatch "\`$KitVersion = '([\d.]+)'" -or $Matches[1] -ne $u.version) { & $fail ('version ' + $Matches[1]); return }
+    # копия заменяемых файлов — на случай, если новая версия не понравится
+    $bak = Join-Path $Root ('backups/kit-' + $KitVersion)
+    $srcFull = (Resolve-Path -LiteralPath $src).Path
+    $files = @(Get-ChildItem -LiteralPath $srcFull -Recurse -File)
+    foreach ($f in $files) {
+      $rel = $f.FullName.Substring($srcFull.Length).TrimStart('\', '/')
+      if ($rel -match '^(tools|reports|backups)[\\/]') { continue }
+      $dst = Join-Path $Root $rel
+      if (Test-Path -LiteralPath $dst) {
+        $b = Join-Path $bak $rel
+        New-Item -ItemType Directory -Force -Path (Split-Path $b -Parent) | Out-Null
+        Copy-Item -LiteralPath $dst -Destination $b -Force
+      }
+    }
+    foreach ($f in $files) {
+      $rel = $f.FullName.Substring($srcFull.Length).TrimStart('\', '/')
+      if ($rel -match '^(tools|reports|backups)[\\/]') { continue }
+      $dst = Join-Path $Root $rel
+      New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
+      Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+    }
+    if (-not $IsWin) { try { & chmod +x (Join-Path $Root 'start.command') } catch {} }
+    Ok (L 'u017' $u.version $files.Count)
+    Say (L 'u018' $bak)
+  } catch { & $fail $_.Exception.Message; return }
+  try { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue } catch {}
+
+  # перезапуск: та же программа PowerShell, те же параметры, в этом же окне
+  Emit 'update' @{ version = $u.version; url = $u.url; canUpdate = $true; state = 'restart' }
+  Say (L 'u019') 'Cyan'
+  Start-Sleep -Milliseconds 1500
+  if ($script:WebUi) {
+    if ($script:WebUrl -match ':(\d+)/\?t=([a-z0-9]{20})$') { $env:PHONEKIT_WEBPORT = $Matches[1]; $env:PHONEKIT_WEBTOKEN = $Matches[2] }
+    $script:WebUi.stop = $true; Start-Sleep -Milliseconds 400; $script:WebUi = $null
+  }
+  $exe = (Get-Process -Id $PID).Path
+  $a = @('-NoProfile')
+  if ($IsWin) { $a += @('-ExecutionPolicy', 'Bypass') }
+  $a += @('-File', (Join-Path $Root 'phonekit.ps1'))
+  foreach ($k in $script:BoundArgs.Keys) {
+    $v = $script:BoundArgs[$k]
+    if ($v -is [System.Management.Automation.SwitchParameter]) { if ($v.IsPresent) { $a += ('-' + $k) } }
+    else { $a += @(('-' + $k), [string]$v) }
+  }
+  if (-not $script:BoundArgs.ContainsKey('Lang') -and $script:Lang) { $a += @('-Lang', $script:Lang) }
+  & $exe @a
+  exit $LASTEXITCODE
+}
+
 # ----------------------------------------------------------------- старт
 
 $script:Notes = New-Object System.Collections.ArrayList
@@ -1923,7 +2013,13 @@ if (-not $NoUpdateCheck) {
     if ([version]::TryParse(($tag + '.0').Split('-')[0], [ref]$nv) -and [version]::TryParse($KitVersion + '.0', [ref]$cv) -and $nv -gt $cv) {
       $link = $(if ($rel.html_url) { [string]$rel.html_url } else { 'https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest' })
       Warn (L 'u001' $tag $link)
-      Emit 'update' @{ version = $tag; url = $link }
+      # Для кнопки «Обновить»: архив релиза и его SHA-256 из описания (без них — только ссылка)
+      $zipUrl = ''
+      foreach ($as in @($rel.assets)) { if ([string]$as.name -match '^phone-kit-[\d.]+\.zip$') { $zipUrl = [string]$as.browser_download_url } }
+      if (-not $UpdateUrl -and $zipUrl -notmatch '^https://github\.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/download/') { $zipUrl = '' }
+      $zipSha = ''; if ([string]$rel.body -match '(?i)\b([0-9a-f]{64})\b') { $zipSha = $Matches[1].ToLower() }
+      if ($zipUrl -and $zipSha) { $script:UpdateInfo = @{ version = $tag; zip = $zipUrl; sha = $zipSha; url = $link } }
+      Emit 'update' @{ version = $tag; url = $link; canUpdate = [bool]$script:UpdateInfo }
     }
   } catch {}
 }
@@ -1936,8 +2032,13 @@ while ($true) {
   Say (L 'm246') 'White'
   Say (L 'm247') 'White'
   Say (L 'k001') 'White'
+  if ($script:UpdateInfo) { Say (L 'u010' $script:UpdateInfo.version) 'Cyan' }
   Say (L 'm248') 'White'
-  $m = Ask (L 'm249') 'menu' @((Opt '1' ((L 'm245') -replace '^\s*\w\)\s*', '')), (Opt '2' ((L 'm246') -replace '^\s*\w\)\s*', '')), (Opt '3' ((L 'm247') -replace '^\s*\w\)\s*', '')), (Opt '4' ((L 'k001') -replace '^\s*\w\)\s*', '')), (Opt 'Q' ((L 'm248') -replace '^\s*\w\)\s*', ''))) @{ screen = 'start' }
+  $mo = @((Opt '1' ((L 'm245') -replace '^\s*\w\)\s*', '')), (Opt '2' ((L 'm246') -replace '^\s*\w\)\s*', '')), (Opt '3' ((L 'm247') -replace '^\s*\w\)\s*', '')), (Opt '4' ((L 'k001') -replace '^\s*\w\)\s*', '')))
+  if ($script:UpdateInfo) { $mo += (Opt 'U' ((L 'u010' $script:UpdateInfo.version) -replace '^\s*\w\)\s*', '')) }
+  $mo += (Opt 'Q' ((L 'm248') -replace '^\s*\w\)\s*', ''))
+  $m = Ask (L 'm249') 'menu' $mo @{ screen = 'start' }
+  if ($script:UpdateInfo -and $m -match '^[UuГг]$') { Invoke-SelfUpdate; continue }
   if ($m -eq '1') { $Mode = 'diag'; break }
   if ($m -eq '2') { $Mode = 'opt'; break }
   if ($m -eq '3') { $Mode = 'restore'; break }
