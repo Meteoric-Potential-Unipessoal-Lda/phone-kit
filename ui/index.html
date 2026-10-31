@@ -327,9 +327,11 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
   function qCode(q, ex) {
     var d = ''; for (var i = 0; i < 6; i++) d += '<input class="digit" maxlength="1" inputmode="numeric" autocomplete="one-time-code" aria-label="' + (i + 1) + '">';
     return '<div class="card pad" style="display:flex;flex-direction:column;gap:14px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><span class="ico">' + ICON.wifi + '</span><h2>' + esc(T('ui_code_t')) + '</h2><p style="color:var(--muted)">' + esc(T('ui_code_d')) + '</p>' +
-      (ex.addr ? '<div class="note ok">' + ICON.tick + '<span>' + esc(T('ui_code_addr')) + ': <span class="mono">' + esc(ex.addr) + '</span></span></div>' : '') +
+      (ex.addr ? '<div class="note ok">' + ICON.tick + '<span>' + esc(T('ui_code_addr')) + ': <span class="mono">' + esc(ex.addr) + '</span></span></div>' + (ex.back ? '<p class="sub">' + esc(T('ui_code_check')) + '</p>' : '') : '') +
       '<div class="digits" id="digits">' + d + '</div><div class="row"><button type="button" class="btn btn-primary" id="codego" disabled>' + esc(T('ui_connect_btn')) + '</button>' +
-      (ex.skip ? '<button type="button" class="btn btn-ghost" data-v="">' + esc(T('ui_skip')) + '</button>' : '') + '</div></div>';
+      (ex.skip ? '<button type="button" class="btn btn-ghost" data-v="">' + esc(T('ui_skip')) + '</button>' : '') +
+      (ex.other ? '<button type="button" class="btn btn-ghost" data-v="A">' + esc(T('ui_code_other')) + '</button>' : '') +
+      (ex.back ? '<button type="button" class="btn btn-ghost" data-v="Q">← ' + esc(T('ui_code_back')) + '</button>' : '') + '</div></div>';
   }
   var TAGS = { auto: ['ui_tag_auto', '#FEF3F2', '#B42318'], base: ['ui_tag_base', '#F2F4F7', '#344054'], ask: ['ui_tag_ask', '#EFF8FF', '#175CD3'] };
   function tagFor(it) {
