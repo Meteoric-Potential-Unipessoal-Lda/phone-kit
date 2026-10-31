@@ -47,7 +47,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '1.1'
+$KitVersion = '1.1.1'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
