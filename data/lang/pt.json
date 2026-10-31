@@ -638,5 +638,8 @@
  "ui_p_max_d": "Tudo, exceto itens «perguntar» e aplicações suspeitas, mais proteção contra anúncios.",
  "ui_pick_t": "O que reverter",
  "ui_pick_d": "Está tudo marcado. Desmarca o que deve continuar desativado.",
- "ui_pick_go": "Reverter os escolhidos"
+ "ui_pick_go": "Reverter os escolhidos",
+ "m008b": "Ou descompacte o platform-tools manualmente na pasta tools, para ficar: {0}",
+ "m061b": "  Pasta do driver: {0}",
+ "w006": "O navegador predefinido é o Internet Explorer, que não executa a página, e não foram encontrados Chrome / Edge / Firefox. Continuamos nesta janela."
 }

@@ -638,5 +638,8 @@
  "ui_p_max_d": "Tout sauf les éléments « demander » et les applis suspectes, plus protection anti-pub.",
  "ui_pick_t": "Que restaurer",
  "ui_pick_d": "Tout est coché. Décochez ce qui doit rester désactivé.",
- "ui_pick_go": "Restaurer la sélection"
+ "ui_pick_go": "Restaurer la sélection",
+ "m008b": "Ou décompressez platform-tools vous-même dans le dossier tools, pour obtenir : {0}",
+ "m061b": "  Dossier du pilote : {0}",
+ "w006": "Le navigateur par défaut est Internet Explorer, qui ne peut pas afficher la page, et Chrome / Edge / Firefox sont introuvables. On continue dans cette fenêtre."
 }

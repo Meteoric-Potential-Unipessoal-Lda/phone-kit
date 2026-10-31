@@ -638,5 +638,8 @@
  "ui_p_max_d": "Everything except “ask” items and suspicious apps, plus ad blocking.",
  "ui_pick_t": "What to roll back",
  "ui_pick_d": "Everything is checked. Uncheck what should stay disabled.",
- "ui_pick_go": "Roll back selected"
+ "ui_pick_go": "Roll back selected",
+ "m008b": "Or unzip platform-tools into the tools folder yourself, so that you get: {0}",
+ "m061b": "  Driver folder: {0}",
+ "w006": "The default browser is Internet Explorer, which can't run the page, and Chrome / Edge / Firefox weren't found. Continuing in this window."
 }

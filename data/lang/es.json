@@ -638,5 +638,8 @@
  "ui_p_max_d": "Todo salvo las opciones «preguntar» y las apps sospechosas, más protección contra anuncios.",
  "ui_pick_t": "Qué revertir",
  "ui_pick_d": "Está todo marcado. Desmarca lo que deba seguir desactivado.",
- "ui_pick_go": "Revertir lo seleccionado"
+ "ui_pick_go": "Revertir lo seleccionado",
+ "m008b": "O descomprima platform-tools a mano en la carpeta tools, para que quede: {0}",
+ "m061b": "  Carpeta del controlador: {0}",
+ "w006": "El navegador predeterminado es Internet Explorer, que no puede abrir la página, y no se encontró Chrome / Edge / Firefox. Seguimos en esta ventana."
 }

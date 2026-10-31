@@ -638,5 +638,8 @@
  "ui_p_max_d": "Tutto tranne le voci «chiedi» e le app sospette, più protezione dalla pubblicità.",
  "ui_pick_t": "Cosa ripristinare",
  "ui_pick_d": "È tutto selezionato. Togli la spunta da ciò che deve restare disattivato.",
- "ui_pick_go": "Ripristina selezionati"
+ "ui_pick_go": "Ripristina selezionati",
+ "m008b": "Oppure estrai platform-tools a mano nella cartella tools, in modo da avere: {0}",
+ "m061b": "  Cartella del driver: {0}",
+ "w006": "Il browser predefinito è Internet Explorer, che non può aprire la pagina, e Chrome / Edge / Firefox non sono stati trovati. Continuiamo in questa finestra."
 }

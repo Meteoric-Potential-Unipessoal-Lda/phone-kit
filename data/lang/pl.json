@@ -638,5 +638,8 @@
  "ui_p_max_d": "Wszystko oprócz pozycji „zapytaj” i podejrzanych aplikacji, plus ochrona przed reklamami.",
  "ui_pick_t": "Co cofnąć",
  "ui_pick_d": "Zaznaczono wszystko. Odznacz to, co ma pozostać wyłączone.",
- "ui_pick_go": "Cofnij wybrane"
+ "ui_pick_go": "Cofnij wybrane",
+ "m008b": "Albo rozpakuj platform-tools ręcznie do folderu tools, tak aby powstało: {0}",
+ "m061b": "  Folder sterownika: {0}",
+ "w006": "Domyślną przeglądarką jest Internet Explorer, w którym strona nie działa, a Chrome / Edge / Firefox nie znaleziono. Kontynuujemy w tym oknie."
 }

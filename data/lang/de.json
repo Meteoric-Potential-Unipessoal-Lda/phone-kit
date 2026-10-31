@@ -638,5 +638,8 @@
  "ui_p_max_d": "Alles außer Punkten „fragen“ und verdächtigen Apps, plus Werbeschutz.",
  "ui_pick_t": "Was rückgängig machen",
  "ui_pick_d": "Alles ist markiert. Entferne die Haken bei allem, was deaktiviert bleiben soll.",
- "ui_pick_go": "Auswahl rückgängig machen"
+ "ui_pick_go": "Auswahl rückgängig machen",
+ "m008b": "Oder entpacken Sie platform-tools selbst in den Ordner tools, sodass Folgendes entsteht: {0}",
+ "m061b": "  Treiberordner: {0}",
+ "w006": "Standardbrowser ist der Internet Explorer, der die Seite nicht ausführen kann, und Chrome / Edge / Firefox wurden nicht gefunden. Es geht in diesem Fenster weiter."
 }

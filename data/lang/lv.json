@@ -638,5 +638,8 @@
  "ui_p_max_d": "Viss, izņemot punktus „pajautāt” un aizdomīgas lietotnes, plus aizsardzība pret reklāmām.",
  "ui_pick_t": "Ko atsaukt",
  "ui_pick_d": "Atzīmēts viss. Noņem atzīmes no tā, kam jāpaliek atspējotam.",
- "ui_pick_go": "Atsaukt izvēlēto"
+ "ui_pick_go": "Atsaukt izvēlēto",
+ "m008b": "Vai izpakojiet platform-tools pats mapē tools, lai iznāktu: {0}",
+ "m061b": "  Draivera mape: {0}",
+ "w006": "Noklusējuma pārlūks ir Internet Explorer, kurā lapa nedarbojas, un Chrome / Edge / Firefox nav atrasti. Turpinām šajā logā."
 }
