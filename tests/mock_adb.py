@@ -204,6 +204,7 @@ if os.environ.get('MOCK_WIFI'):
     if c == 'mdns':
         print('List of discovered mdns services')
         if not os.environ.get('MOCK_NOMDNS'): print('adb-%s-AbCd\t_adb-tls-pairing._tcp\t192.168.1.113:37123' % SERIAL)
+        if os.environ.get('MOCK_MDNSJUNK'): print('adb-OLD-ZzZz\t_adb-tls-pairing._tcp\t10.148.34.2:36')   # мусор из кэша mDNS (как у Леонида)
         sys.exit(0)
     if c == 'pair':
         if args[2] == '123456': st['paired'] = 1; save(); print('Successfully paired to %s [guid=adb-%s-AbCd]' % (args[1], SERIAL))
