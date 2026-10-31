@@ -9,7 +9,8 @@
   Меню: 1) диагностика — только чтение (белый список команд чтения, Test-ReadOnly);
         2) оптимизация — диагностика, план с галочками, «да», изменения партиями с проверкой,
            только обратимые команды из белого списка записи (Test-WriteAllowed), журнал для отката;
-        3) откат по журналу.
+        3) откат по журналу (в том числе возврат файлов, перенесённых пунктом 4);
+        4) память телефона: мусор, перенос на компьютер (удаление только после проверки копии), большие файлы.
 
   Параметры (необязательно):
     -Prepare             подготовить папку tools (ADB для Windows и Mac) и выйти
@@ -21,6 +22,8 @@
     -Console             только консоль, без страницы в браузере
     -Web -NoBrowser      страница без автозапуска браузера (адрес печатается в консоли)
     -NoUpdateCheck       не проверять новую версию на GitHub
+    -CopyTo D:\Фото      куда пункт 4 копирует файлы с телефона (по умолчанию — папка «Изображения»)
+    -BigMb 100           пункт 4: с какого размера файл считается большим
 
   База пакетов (data/uad.tsv) — из Universal Android Debloater Next Generation
   (github.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation, GPL-3.0),
@@ -37,12 +40,14 @@ param(
   [switch]$NoBrowser,
   [switch]$NoUpdateCheck,
   [string]$UpdateUrl = '',
+  [string]$CopyTo = '',
+  [int]$BigMb = 100,
   [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '1.0.1'
+$KitVersion = '1.1'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -362,7 +367,8 @@ $ReadOnlyPatterns = @(
   '^wm (size|density)$',
   '^dumpsys batterystats$',
   '^pm list packages -U$',
-  '^du -s -k( /sdcard/[A-Za-z0-9_./-]+)+$'
+  '^du -s -k( /sdcard/[A-Za-z0-9_./-]+)+$',
+  "^find /sdcard(/[A-Za-z0-9_./-]*)? -type f( -size \+\d+M)? -exec stat -c '%s %Y %n' \{\} \+$"
 )
 function Test-ReadOnly([string]$cmd) {
   if ($cmd -match '[;&|<>`$\\"*?]') { return $false }
@@ -1005,6 +1011,26 @@ $WritePatterns = @(
   '^svc power reboot$',
   '^reboot$'
 )
+# Пункт 4: папки «мусора» (удаляются целиком, без копии) и папки для переноса на компьютер
+$JunkDirs = [ordered]@{
+  'thumbs'   = @('/sdcard/DCIM/.thumbnails', '/sdcard/Pictures/.thumbnails', '/sdcard/Movies/.thumbnails', '/sdcard/.thumbnails')
+  'telegram' = @('/sdcard/Android/data/org.telegram.messenger/cache', '/sdcard/Android/data/org.telegram.messenger/files/Telegram', '/sdcard/Telegram', '/sdcard/Android/data/org.telegram.messenger.web/cache', '/sdcard/Android/data/org.telegram.messenger.web/files/Telegram')
+  'logs'     = @('/sdcard/MIUI/debug_log', '/sdcard/mtklog', '/sdcard/log')
+}
+$MoveDirs = [ordered]@{
+  'camera'   = @('/sdcard/DCIM/Camera')
+  'pictures' = @('/sdcard/Pictures', '/sdcard/DCIM/Screenshots')
+  'movies'   = @('/sdcard/Movies')
+  'download' = @('/sdcard/Download')
+  'whatsapp' = @('/sdcard/Android/media/com.whatsapp/WhatsApp/Media', '/sdcard/WhatsApp/Media')
+  'viber'    = @('/sdcard/Android/media/com.viber.voip', '/sdcard/viber/media')
+}
+$junkAlt = (@($JunkDirs.Values | ForEach-Object { $_ } | ForEach-Object { [regex]::Escape($_) }) -join '|')
+$WritePatterns += @(
+  ("^rm -rf '(" + $junkAlt + ")'$"),
+  "^rm -f( '/sdcard/(?!Android/(data|obb)/)(?![^']*/\.\./)[^']+')+$",
+  "^mkdir -p '/sdcard/(?!Android/(data|obb)/)(?![^']*/\.\./)[^']+'$"
+)
 function Test-WriteAllowed([string]$cmd) {
   if ($cmd -match '[;&|<>`$\\"*?]') { return $false }
   foreach ($p in $WritePatterns) { if ($cmd -cmatch $p) { return $true } }
@@ -1177,6 +1203,7 @@ function Undo-Entry($e) {
       if (-not $old -or $old -eq 'null') { [void](ShW "settings delete global $($e.key)") } else { [void](ShW "settings put global $($e.key) $old") }
       OptLog (L 'm147' $($e.key) $(if ($old -and $old -ne 'null') { $old } else { (L 'm146') })) 'ok'
     }
+    'moved' { Restore-Moved $e }
     'appops' {
       $old = [string]$e.old
       if ($old -notin @('allow', 'ignore', 'default')) { $old = 'default' }
@@ -1494,6 +1521,7 @@ function Invoke-Restore {
       'uninstall' { (L 'm233' $($e.pkg)) }
       'setting' { (L 'm234' $($e.key) $(if ($e.old -and $e.old -ne 'null') { $e.old } else { (L 'm146') })) }
       'appops' { (L 'm235' $($e.pkg)) }
+      'moved' { (L 'k040' @($e.files).Count $(Fmt-Bytes ([int64]$e.bytes)) $([string]$e.title)) }
       default { [string]$e.t }
     }
     $t = ($t.Trim() -replace '^-\s*', '')
@@ -1529,6 +1557,297 @@ function Invoke-Restore {
   OptLog (L 'm240')
   [IO.File]::WriteAllText((Join-Path $rd 'restore.txt'), ($script:OptLines -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
   Ok ((L 'm241') + $rd)
+}
+
+# ----------------------------------------------------------------- память телефона (ПЗУ): мусор, перенос на компьютер, большие файлы
+# Правило: личные файлы удаляются с телефона ТОЛЬКО после того, как копия на компьютере есть и совпала по размеру.
+# Без копии удаляется только «мусор»: миниатюры (телефон создаст заново), кэш Telegram (лежит в облаке),
+# журналы отладки, установочные .apk (по галочке). Перенос записывается в журнал — откат (пункт 3) заливает файлы обратно.
+
+function Get-RemoteFiles([string]$dir, [int]$minMb = 0) {
+  $cmd = 'find ' + $dir + ' -type f' + $(if ($minMb -gt 0) { " -size +$($minMb)M" } else { '' }) + " -exec stat -c '%s %Y %n' {} +"
+  $out = Sh $cmd 900
+  $r = New-Object System.Collections.ArrayList
+  foreach ($l in ($out -split "`n")) {
+    $l = $l -replace ' /sdcard//', ' /sdcard/'
+    if ($l -match '^(\d+) (\d+) (/sdcard/.+)$') { [void]$r.Add([pscustomobject]@{ Size = [int64]$Matches[1]; Mtime = [int64]$Matches[2]; Path = $Matches[3] }) }
+  }
+  return ,$r
+}
+# Имя можно безопасно передать в rm на телефоне (одинарные кавычки) — без кавычек, $, `, \ и т.п.
+function Test-SafeRemote([string]$p) {
+  if ($p -match '[''"$\\*?;&|<>`]' -or $p -match '[\r\n]') { return $false }
+  if ($p -match '/\.\./' -or $p -notmatch '^/sdcard/') { return $false }
+  return $true
+}
+function Remove-RemoteFiles([string[]]$paths) {
+  $ok = 0; $batch = New-Object System.Collections.ArrayList; $len = 0
+  $flush = {
+    if ($batch.Count -eq 0) { return }
+    $c = 'rm -f ' + (($batch | ForEach-Object { "'" + $_ + "'" }) -join ' ')
+    $o = ShW $c 300
+    if ($o -match 'No such file|Permission denied|Read-only|denied') { OptLog (L 'k046' $batch.Count $o) 'warn' } else { $script:rmOk += $batch.Count }
+    $batch.Clear(); $script:rmLen = 0
+  }
+  $script:rmOk = 0; $script:rmLen = 0
+  foreach ($p in $paths) {
+    if ($script:rmLen + $p.Length -gt 6000) { & $flush }
+    [void]$batch.Add($p); $script:rmLen += $p.Length + 3
+  }
+  & $flush
+  return $script:rmOk
+}
+function Get-LocalFreeMb([string]$path) {
+  try {
+    $full = [IO.Path]::GetFullPath($path)
+    $d = New-Object IO.DriveInfo([IO.Path]::GetPathRoot($full))
+    return [math]::Round($d.AvailableFreeSpace / 1MB)
+  } catch { return -1 }
+}
+function Fmt-Bytes([int64]$b) {
+  $mb = $b / 1MB
+  if ($mb -ge 10) { return (Fmt-Mb $mb) }
+  $v = ([math]::Round($mb, 1)).ToString([Globalization.CultureInfo]::InvariantCulture)
+  if ($script:Lang -ne 'en') { $v = $v.Replace('.', ',') }
+  return (L 's011' $v)
+}
+function Parse-Nums([string]$s, [int]$max) {
+  $r = @()
+  foreach ($t in ($s -split '[,\s]+')) {
+    if ($t -match '^(\d+)-(\d+)$') { for ($i = [int]$Matches[1]; $i -le [int]$Matches[2]; $i++) { if ($i -ge 1 -and $i -le $max) { $r += $i } } }
+    elseif ($t -match '^\d+$' -and [int]$t -ge 1 -and [int]$t -le $max) { $r += [int]$t }
+  }
+  return ,$r
+}
+
+# Копировать файлы одной папки телефона в папку компьютера и проверить размеры. Возвращает проверенные.
+function Copy-RemoteBatch($files, [string]$localDir) {
+  New-Item -ItemType Directory -Force -Path $localDir | Out-Null
+  $mb = [math]::Round((($files | Measure-Object -Property Size -Sum).Sum) / 1MB)
+  $a = @('-s', $script:Serial, 'pull', '-a') + @($files | ForEach-Object { $_.Path }) + @($localDir)
+  $r = Invoke-Adb $a ([int](120 + $mb * 2))
+  Log-Change ("pull " + $files.Count + " -> " + $localDir + "`r`n           " + (($r.Out + ' ' + $r.Err) -replace "`r", '').Trim())
+  $good = New-Object System.Collections.ArrayList
+  foreach ($f in $files) {
+    $lp = Join-Path $localDir ($f.Path.Substring($f.Path.LastIndexOf('/') + 1))
+    if ((Test-Path -LiteralPath $lp) -and (Get-Item -LiteralPath $lp).Length -eq $f.Size) { [void]$good.Add($f) }
+  }
+  return ,$good
+}
+
+function Restore-Moved($e) {
+  $dest = [string]$e.dest; $files = @($e.files)
+  $byDir = [ordered]@{}
+  foreach ($rel in $files) {
+    $rel = [string]$rel; $i = $rel.LastIndexOf('/')
+    $d = $(if ($i -gt 0) { $rel.Substring(0, $i) } else { '' })
+    if (-not $byDir.Contains($d)) { $byDir[$d] = New-Object System.Collections.ArrayList }
+    [void]$byDir[$d].Add($rel)
+  }
+  $ok = 0; $miss = 0
+  foreach ($d in $byDir.Keys) {
+    $rdir = ('/sdcard/' + $d).TrimEnd('/')
+    if (Test-SafeRemote ($rdir + '/')) { [void](ShW ("mkdir -p '" + $rdir + "'")) }
+    $locals = @()
+    foreach ($rel in $byDir[$d]) { $lp = Join-Path $dest $rel; if (Test-Path -LiteralPath $lp) { $locals += $lp } else { $miss++ } }
+    for ($k = 0; $k -lt $locals.Count; $k += 40) {
+      $part = @($locals[$k..([math]::Min($k + 39, $locals.Count - 1))])
+      $mb = 0; foreach ($p in $part) { $mb += (Get-Item -LiteralPath $p).Length / 1MB }
+      $r = Invoke-Adb (@('-s', $script:Serial, 'push') + $part + @($rdir + '/')) ([int](120 + $mb * 2))
+      Log-Change ("push " + $part.Count + " -> " + $rdir + "`r`n           " + (($r.Out + ' ' + $r.Err) -replace "`r", '').Trim())
+      if ($r.Code -eq 0) { $ok += $part.Count } else { OptLog (L 'k042' $part.Count $rdir (($r.Err + ' ' + $r.Out).Trim())) 'warn' }
+    }
+  }
+  OptLog (L 'k041' $ok $miss) $(if ($miss) { 'warn' } else { 'ok' })
+}
+
+function Invoke-Storage {
+  Emit 'stage' @{ s = 'diag'; mode = 'storage' }
+  Title (L 'k002')
+  $script:Props = Parse-Props (Sh 'getprop')
+  $script:sdk = 0; [void][int]::TryParse((P 'ro.build.version.sdk'), [ref]$script:sdk)
+  $mdl = P 'ro.product.model'
+  $safeM = ($mdl -replace '[^A-Za-z0-9_.-]', '_'); if (-not $safeM) { $safeM = 'phone' }
+  $safeL = ($Label -replace '[\\/:*?"<>|\s]+', '_').Trim('_')
+  $rn = ((Get-Date -Format 'yyyy-MM-dd_HH-mm'), $safeL, $safeM, 'storage' | Where-Object { $_ }) -join '_'
+  $rd = Join-Path $Root ("reports/" + $rn)
+  New-Item -ItemType Directory -Force -Path $rd | Out-Null
+  $script:ChangeLog = Join-Path $rd 'changes.log'
+  $script:OptLines = New-Object System.Collections.ArrayList
+  $total = 0; $free0 = 0
+  foreach ($l in ((Sh 'df -k /data') -split "`n")) { if ($l -match '^\S+\s+(\d+)\s+\d+\s+(\d+)\s+\d+%') { $total = [int64]$Matches[1]; $free0 = [int64]$Matches[2] } }
+  OptLog (L 'k004' (Fmt-Mb (Mb $free0)) (Fmt-Mb (Mb $total)))
+  Say (L 'k003')
+
+  # --- размеры папок (du — только чтение)
+  $all = @(); foreach ($v in $JunkDirs.Values) { $all += $v }; foreach ($v in $MoveDirs.Values) { $all += $v }
+  $duKb = @{}
+  foreach ($l in ((Sh ('du -s -k ' + ($all -join ' ')) 300) -split "`n")) { if ($l -match '^(\d+)\s+(/\S+)$') { $duKb[$Matches[2]] = [int64]$Matches[1] } }
+  $sumKb = { param($list) $s = [int64]0; foreach ($p in $list) { if ($duKb.ContainsKey($p)) { $s += $duKb[$p] } }; return $s }
+
+  $items = New-Object System.Collections.ArrayList
+  function AddS($kind, $key, $text, $on, $group, $bytes, $paths, $obj = $null) { [void]$items.Add([pscustomobject]@{ Kind = $kind; Key = $key; Text = $text; On = [bool]$on; Group = $group; Bytes = [int64]$bytes; Paths = $paths; Obj = $obj }) }
+  $gJ = (L 'k005'); $gM = (L 'k006'); $gB = (L 'k007' $BigMb)
+  foreach ($k in $JunkDirs.Keys) {
+    $kb = & $sumKb $JunkDirs[$k]
+    if ($kb -lt 64) { continue }
+    $t = @{ 'thumbs' = 'k010'; 'telegram' = 'k011'; 'logs' = 'k012' }[$k]
+    AddS 'junk' $k (L $t (Fmt-Bytes ($kb * 1KB))) $true $gJ ($kb * 1KB) @($JunkDirs[$k] | Where-Object { $duKb.ContainsKey($_) })
+  }
+  AddS 'cache' 'cache' (L 'k013') $true $gJ 0 @()
+  $dl = Get-RemoteFiles '/sdcard/Download'
+  $apks = @($dl | Where-Object { $_.Path -match '\.(apk|xapk|apks)$' })
+  if ($apks.Count) { $ab = [int64]0; foreach ($f in $apks) { $ab += $f.Size }; AddS 'apk' 'apk' (L 'k014' $apks.Count (Fmt-Bytes $ab)) $false $gJ $ab @($apks | ForEach-Object { $_.Path }) }
+  foreach ($k in $MoveDirs.Keys) {
+    $kb = & $sumKb $MoveDirs[$k]
+    if ($kb -lt 1024) { continue }
+    $t = @{ 'camera' = 'k015'; 'pictures' = 'k016'; 'movies' = 'k017'; 'download' = 'k018'; 'whatsapp' = 'k019'; 'viber' = 'k020' }[$k]
+    AddS 'move' $k (L $t (Fmt-Bytes ($kb * 1KB))) $false $gM ($kb * 1KB) @($MoveDirs[$k] | Where-Object { $duKb.ContainsKey($_) })
+  }
+  $big = @(Get-RemoteFiles '/sdcard/' $BigMb | Where-Object { $_.Path -notmatch '^/sdcard/Android/(data|obb)/' -and $_.Path -notmatch '/\.thumbnails/' } | Sort-Object Size -Descending | Select-Object -First 15)
+  foreach ($f in $big) {
+    $when = ''; try { $when = ([datetime]'1970-01-01').AddSeconds($f.Mtime).ToLocalTime().ToString('yyyy-MM-dd') } catch {}
+    AddS 'big' $f.Path (L 'k021' ($f.Path.Substring(8)) (Fmt-Bytes $f.Size) $when) $false $gB $f.Size @($f.Path) $f
+  }
+  Save-Raw2 $rd 'storage_scan.txt' ((@($duKb.Keys | Sort-Object | ForEach-Object { "{0}`t{1}" -f $duKb[$_], $_ }) + @('') + @($big | ForEach-Object { "{0}`t{1}" -f $_.Size, $_.Path })) -join "`n")
+
+  # --- план
+  Emit 'stage' @{ s = 'plan' }
+  while ($true) {
+    Say ''
+    $g = ''
+    for ($i = 0; $i -lt $items.Count; $i++) {
+      $it = $items[$i]
+      if ($it.Group -ne $g) { $g = $it.Group; Say ("  --- $g ---") 'Cyan' }
+      if ($it.On) { Say ("  [x] {0,2}. {1}" -f ($i + 1), $it.Text) 'Green' } else { Say ("  [ ] {0,2}. {1}" -f ($i + 1), $it.Text) 'Gray' }
+    }
+    Say ''
+    $pl = @(for ($i = 0; $i -lt $items.Count; $i++) { $it = $items[$i]; [ordered]@{ n = $i + 1; kind = $it.Kind; pkg = ''; text = $it.Text; on = [bool]$it.On; group = $it.Group; tier = '' } })
+    $a = Ask (L 'k023') 'plan' $null @{ items = $pl; title = (L 'k024'); lead = (L 'k025'); rev = (L 'k048'); noprof = $true }
+    if ($a -eq '') { break }
+    if ($a -match '^[QqЙй]$') { OptLog (L 'm207'); return }
+    if ($a.StartsWith('=')) {
+      $nums = Parse-Nums $a.Substring(1) $items.Count
+      for ($i = 0; $i -lt $items.Count; $i++) { $items[$i].On = ($nums -contains ($i + 1)) }
+      break
+    }
+    foreach ($n in (Parse-Nums $a $items.Count)) { $items[$n - 1].On = -not $items[$n - 1].On }
+  }
+  $sel = @($items | Where-Object { $_.On })
+  if ($sel.Count -eq 0) { OptLog (L 'm207'); return }
+
+  # --- куда копировать и хватит ли места
+  $moves = @($sel | Where-Object { $_.Kind -in @('move', 'big') })
+  $base = $CopyTo
+  if (-not $base) { try { $base = [Environment]::GetFolderPath('MyPictures') } catch {} }
+  if (-not $base) { $base = Join-Path $Root 'copies' }
+  $dname = (L 'k030' $safeM (Get-Date -Format 'yyyy-MM-dd HH-mm')) -replace '[\\/:*?"<>|]', '_'
+  $dest = Join-Path $base $dname
+  Say ''
+  Say (L 'k026') 'White'
+  foreach ($it in $sel) { Say ('  - ' + $it.Text) }
+  if ($moves.Count) {
+    # оценка места: большие файлы внутри уже выбранных папок не считаем второй раз
+    $selDirs = @($moves | Where-Object { $_.Kind -eq 'move' } | ForEach-Object { $_.Paths } | ForEach-Object { $_ + '/' })
+    $need = [int64]0
+    foreach ($it in $moves) {
+      if ($it.Kind -eq 'big') { $inside = $false; foreach ($d in $selDirs) { if ($it.Paths[0].StartsWith($d)) { $inside = $true } }; if ($inside) { continue } }
+      $need += $it.Bytes
+    }
+    New-Item -ItemType Directory -Force -Path $base | Out-Null
+    $freeL = Get-LocalFreeMb $base
+    Say (L 'k027' $dest $(if ($freeL -ge 0) { Fmt-Mb $freeL } else { '?' }) (Fmt-Bytes $need)) 'White'
+    if ($freeL -ge 0 -and $freeL -lt ($need / 1MB) * 1.05 + 500) { Bad (L 'k028' (Fmt-Bytes $need) (Fmt-Mb $freeL)); return }
+  }
+  if (-not (Confirm-Yes (L 'k029') (L 'w012'))) { OptLog (L 'm207'); return }
+
+  # --- журнал (для отката перенесённого) — до первого изменения
+  Emit 'stage' @{ s = 'run' }
+  $kdir = Join-Path $Root 'backups'
+  New-Item -ItemType Directory -Force -Path $kdir | Out-Null
+  $script:StateFiles = @((Join-Path $rd 'state.json'), (Join-Path $kdir ($rn + '.json')))
+  $script:Journal = New-Object System.Collections.ArrayList
+  $script:State = [ordered]@{ kit = "phone-kit $KitVersion"; created = (Get-Date -Format 's'); label = $Label; serial = $script:Serial; serialno = (P 'ro.serialno')
+    model = $mdl; device = (P 'ro.product.device'); fingerprint = (P 'ro.build.fingerprint'); sdk = $script:sdk; kind = 'storage'; journal = $script:Journal }
+  $done = 0; $steps = $sel.Count
+  $prog = { Emit 'progress' @{ done = [math]::Min($script:stDone, $steps); total = $steps } }
+  $script:stDone = 0
+  $rep = New-Object System.Collections.ArrayList
+
+  foreach ($it in @($sel | Where-Object { $_.Kind -in @('junk', 'cache', 'apk') })) {
+    if ($it.Kind -eq 'cache') { Clear-Caches }
+    elseif ($it.Kind -eq 'junk') {
+      foreach ($p in $it.Paths) { $o = ShW ("rm -rf '" + $p + "'") 300; if ($o -match 'denied|Read-only') { OptLog (L 'k046' $p $o) 'warn' } }
+      $tt = ($it.Text -replace '\s+[—-]\s+.*$', '')
+      OptLog (L 'k031' $tt (Fmt-Bytes $it.Bytes)) 'ok'
+    } else {
+      $safe = @($it.Paths | Where-Object { Test-SafeRemote $_ })
+      $n = Remove-RemoteFiles $safe
+      $ab = [int64]0; foreach ($f in $apks) { if ($safe -contains $f.Path) { $ab += $f.Size } }
+      OptLog (L 'k031' ($it.Text -replace '\s+[—-]\s+.*$', '') ((L 'k047' $n) + ', ' + (Fmt-Bytes $ab))) 'ok'
+      if ($safe.Count -lt @($it.Paths).Count) { OptLog (L 'k035' (@($it.Paths).Count - $safe.Count)) 'warn' }
+    }
+    $script:stDone++; & $prog
+  }
+
+  # перенос: категории и большие файлы, без повторов
+  $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+  foreach ($it in $moves) {
+    $files = New-Object System.Collections.ArrayList
+    if ($it.Kind -eq 'big') { [void]$files.Add($it.Obj) }
+    else { foreach ($d in $it.Paths) { foreach ($f in (Get-RemoteFiles $d)) { [void]$files.Add($f) } } }
+    $files = @($files | Where-Object { $_.Path -notmatch '/\.(thumbnails|trashed-|pending-)|/\.nomedia$|/\.trashed-|/\.pending-' -and $seen.Add($_.Path) })
+    if ($files.Count -eq 0) { $script:stDone++; & $prog; continue }
+    $bytes = [int64]0; foreach ($f in $files) { $bytes += $f.Size }
+    $title = ($it.Text -replace '\s+[—-]\s+.*$', '')
+    OptLog (L 'k032' $title $files.Count (Fmt-Bytes $bytes))
+    $moved = New-Object System.Collections.ArrayList; $failed = 0; $unsafe = 0; $movedBytes = [int64]0
+    $groups = @($files | Group-Object { $_.Path.Substring(0, $_.Path.LastIndexOf('/')) })
+    foreach ($gr in $groups) {
+      $rdir = $gr.Name; $relDir = $rdir.Substring([math]::Min(8, $rdir.Length)).TrimStart('/')
+      $ldir = $(if ($relDir) { Join-Path $dest $relDir } else { $dest })
+      $list = @($gr.Group)
+      for ($k = 0; $k -lt $list.Count; $k += 40) {
+        $part = @($list[$k..([math]::Min($k + 39, $list.Count - 1))])
+        $good = Copy-RemoteBatch $part $ldir
+        $failed += $part.Count - $good.Count
+        $del = @($good | Where-Object { Test-SafeRemote $_.Path })
+        $unsafe += $good.Count - $del.Count
+        if ($del.Count) {
+          [void](Remove-RemoteFiles @($del | ForEach-Object { $_.Path }))
+          foreach ($f in $del) { [void]$moved.Add($f.Path.Substring(8)); $movedBytes += $f.Size }
+        }
+      }
+    }
+    if ($moved.Count) { Add-Journal ([ordered]@{ t = 'moved'; title = $title; dest = $dest; bytes = $movedBytes; files = @($moved) }) }
+    $line = L 'k033' $title $moved.Count (Fmt-Bytes $movedBytes)
+    OptLog $line 'ok'; [void]$rep.Add($line)
+    if ($failed) { OptLog (L 'k034' $failed) 'warn'; [void]$rep.Add((L 'k034' $failed)) }
+    if ($unsafe) { OptLog (L 'k035' $unsafe) 'warn'; [void]$rep.Add((L 'k035' $unsafe)) }
+    $script:stDone++; & $prog
+  }
+
+  Start-Sleep -Seconds 2
+  $free1 = Get-DataFree
+  Say ''
+  $fl = L 'k036' (Fmt-Mb ([math]::Max(0, (Mb ($free1 - $free0))))) (Fmt-Mb (Mb $free1))
+  OptLog $fl 'ok'
+  if ($script:Journal.Count) {
+    OptLog (L 'k037' $dest) 'ok'
+    OptLog (L 'k039')
+    if ($script:sdk -gt 0 -and $script:sdk -lt 30) { OptLog (L 'k038') 'warn' }
+  }
+  $txt = @((L 'k044' $KitVersion), ('{0}  {1}  {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm'), $mdl, $Label), '', (L 'k004' (Fmt-Mb (Mb $free0)) (Fmt-Mb (Mb $total))), '') + @($script:OptLines)
+  $repTxt = Join-Path $rd 'storage.txt'
+  [IO.File]::WriteAllText($repTxt, ($txt -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
+  Ok (L 'k045' $repTxt)
+  Emit 'report' @{ zip = $repTxt; txt = $repTxt; mode = 'storage'; journal = $script:Journal.Count; dest = $(if ($script:Journal.Count) { $dest } else { '' }) }
+  Emit 'stage' @{ s = 'done'; mode = 'storage' }
+  if ($IsWin -and $script:Journal.Count -and -not $NoPause) { try { Start-Process explorer.exe -ArgumentList ('"' + $dest + '"') } catch {} }
+  elseif ($IsMac -and $script:Journal.Count -and -not $NoPause) { try { & open $dest } catch {} }
+}
+function Save-Raw2([string]$dir, [string]$name, [string]$txt) {
+  try { [IO.File]::WriteAllText((Join-Path $dir $name), $txt, (New-Object Text.UTF8Encoding($false))) } catch {}
 }
 
 # ----------------------------------------------------------------- старт
@@ -1583,11 +1902,13 @@ while ($true) {
   Say (L 'm245') 'White'
   Say (L 'm246') 'White'
   Say (L 'm247') 'White'
+  Say (L 'k001') 'White'
   Say (L 'm248') 'White'
-  $m = Ask (L 'm249') 'menu' @((Opt '1' ((L 'm245') -replace '^\s*\w\)\s*', '')), (Opt '2' ((L 'm246') -replace '^\s*\w\)\s*', '')), (Opt '3' ((L 'm247') -replace '^\s*\w\)\s*', '')), (Opt 'Q' ((L 'm248') -replace '^\s*\w\)\s*', ''))) @{ screen = 'start' }
+  $m = Ask (L 'm249') 'menu' @((Opt '1' ((L 'm245') -replace '^\s*\w\)\s*', '')), (Opt '2' ((L 'm246') -replace '^\s*\w\)\s*', '')), (Opt '3' ((L 'm247') -replace '^\s*\w\)\s*', '')), (Opt '4' ((L 'k001') -replace '^\s*\w\)\s*', '')), (Opt 'Q' ((L 'm248') -replace '^\s*\w\)\s*', ''))) @{ screen = 'start' }
   if ($m -eq '1') { $Mode = 'diag'; break }
   if ($m -eq '2') { $Mode = 'opt'; break }
   if ($m -eq '3') { $Mode = 'restore'; break }
+  if ($m -eq '4') { $Mode = 'storage'; break }
   if ($m -match '^[QqЙй]$') { Finish 0 }
 }
 if (-not $Label -and $Mode -ne 'restore') { $Label = Ask (L 'm250') 'text' $null @{ optional = $true } }
@@ -1613,6 +1934,7 @@ if ((Sh 'getprop ro.build.characteristics') -match 'tv') {
   if (-not (Confirm-Yes (L 'm255') (L 'w016'))) { Finish 0 }
 }
 if ($Mode -eq 'restore') { Invoke-Restore; Finish 0 }
+if ($Mode -eq 'storage') { Invoke-Storage; Finish 0 }
 $script:OptLines = New-Object System.Collections.ArrayList
 
 # ----------------------------------------------------------------- сбор
