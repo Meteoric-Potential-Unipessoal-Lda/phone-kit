@@ -176,7 +176,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
   </nav>
   <main>
     <div class="banner" id="offline" data-t="ui_offline" style="order:-2"></div>
-    <div class="upd" id="upd" style="order:-2"><span id="updText"></span><a class="btn btn-primary btn-sm" id="updLink" target="_blank" rel="noopener noreferrer" href="#"></a></div>
+    <div class="upd" id="upd" style="order:-2"><span id="updText"></span><button type="button" class="btn btn-primary btn-sm" id="updDo" style="display:none"></button><a class="btn btn-ghost btn-sm" id="updLink" target="_blank" rel="noopener noreferrer" href="#"></a></div>
     <div id="qbox"></div>
     <div id="panel"></div>
     <section class="card" id="logcard">
@@ -224,7 +224,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
       var nodes = document.querySelectorAll('[data-t]');
       for (var i = 0; i < nodes.length; i++) nodes[i].textContent = T(nodes[i].getAttribute('data-t'));
       renderSteps(); renderPanel(); renderQuestion(true); renderLogToggle();
-      if (S.update) { $('updText').textContent = T('ui_update', S.update.version); $('updLink').textContent = T('ui_update_btn'); }
+      renderUpdate();
     });
   }
   $('lang').addEventListener('change', function () { var c = this.value; api('/api/lang', { code: c }).then(function () { return loadLang(c); }).catch(function () {}); });
@@ -262,6 +262,23 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
   function logSince(from, max) { var a = S.log.slice(from); return a.slice(Math.max(0, a.length - max)); }
 
   // ---------------------------------------------------------------- answers
+  // Плашка «Есть новая версия»: кнопка «Обновить» (набор сам скачает, сверит SHA-256 и перезапустится) и ссылка на релиз
+  function renderUpdate() {
+    var d = S.update; if (!d) return;
+    var st = d.state || '', txt = T('ui_update', d.version);
+    if (st === 'downloading') txt = T('ui_update_dl', d.version);
+    else if (st === 'failed') txt = T('ui_update_fail', d.msg || '');
+    else if (st === 'restart') txt = T('ui_update_restart', d.version);
+    $('updText').textContent = txt;
+    var onStart = S.q && S.q.extra && S.q.extra.screen === 'start';
+    var b = $('updDo'); b.textContent = T('ui_update_do');
+    b.style.display = (d.canUpdate && (st === '' || st === 'failed') && onStart) ? '' : 'none';
+    b.onclick = function () { if (S.q && S.q.extra && S.q.extra.screen === 'start') answer('U'); };
+    $('updLink').textContent = T('ui_update_btn');
+    $('updLink').style.display = st === 'restart' ? 'none' : '';
+    $('updLink').href = /^https:\/\/github\.com\//.test(d.url) ? d.url : 'https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest';
+    $('upd').classList.add('on');
+  }
   function answer(v) {
     if (!S.q || S.sent) return;
     S.sent = true;
@@ -274,6 +291,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
   // ---------------------------------------------------------------- question
   function renderQuestion(force) {
     var q = S.q, box = $('qbox');
+    renderUpdate();
     if (!q) { box.innerHTML = ''; S.sent = false; return; }
     if (!force && S.qid === q.id) return;
     S.qid = q.id; S.sent = false;
@@ -555,12 +573,14 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     else if (ev.type === 'finished') S.finished = true;
     else if (ev.type === 'compare') S.compare = d;
     else if (ev.type === 'client') S.client = d;
-    else if (ev.type === 'update') { S.update = d; $('updText').textContent = T('ui_update', d.version); $('updLink').textContent = T('ui_update_btn'); $('updLink').href = /^https:\/\/github\.com\//.test(d.url) ? d.url : 'https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest'; $('upd').classList.add('on'); }
+    else if (ev.type === 'update') { S.update = d; renderUpdate(); }
   }
   var failures = 0, first = true;
   function poll() {
     api('/api/state?since=' + S.seq).then(function (st) {
       failures = 0; $('offline').classList.remove('on');
+      // набор перезапустился (самообновление) на том же адресе — перечитать страницу
+      if (st.boot) { if (S.boot && st.boot !== S.boot) { location.reload(); return; } S.boot = st.boot; }
       if (first) { first = false; $('kitver').textContent = 'phone-kit ' + st.kit; if (st.lang && st.lang !== S.lang) loadLang(st.lang); }
       var changed = false;
       for (var i = 0; i < st.events.length; i++) { apply(st.events[i]); if (st.events[i].type !== 'log' || S.stage === 'connect' || S.stage === 'run' || S.stage === 'restore' || (S.stage === 'diag' && !S.summary)) changed = true; }
@@ -571,7 +591,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
       if (qchanged) { if (!nq) S.qid = null; renderQuestion(false); changed = true; }
       if (changed) { renderSteps(); renderPanel(); }
     }).catch(function () {
-      if (++failures >= 4 && !S.closed) $('offline').classList.add('on');
+      if (++failures >= 4 && !S.closed && !(S.update && S.update.state === 'restart')) $('offline').classList.add('on');
     }).then(function () { if (!S.closed) setTimeout(poll, S.q ? 600 : 400); });
   }
 
