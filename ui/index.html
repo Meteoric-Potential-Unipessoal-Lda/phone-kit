@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>phone-kit</title>
 <style>
@@ -121,6 +122,30 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
 </style>
 </head>
 <body>
+<script>
+/* Старый браузер (Internet Explorer и т.п.): основной скрипт в нём не запустится — показать подсказку. Только ES5. */
+(function(){
+  var ok = !!(window.fetch && window.Promise && window.Symbol && Array.prototype.includes);
+  if (ok) return;
+  var M = {
+    ru:'Этот браузер устарел, страница в нём не работает. Откройте этот же адрес в Chrome, Edge, Firefox или Яндекс.Браузере — или отвечайте в чёрном окне набора.',
+    uk:'Цей браузер застарів, сторінка в ньому не працює. Відкрийте цю ж адресу в Chrome, Edge, Firefox — або відповідайте в чорному вікні набору.',
+    en:'This browser is too old for this page. Open the same address in Chrome, Edge or Firefox, or answer in the black kit window.',
+    pt:'Este navegador é demasiado antigo. Abra o mesmo endereço no Chrome, Edge ou Firefox, ou responda na janela preta do kit.',
+    es:'Este navegador es demasiado antiguo. Abra la misma dirección en Chrome, Edge o Firefox, o responda en la ventana negra del kit.',
+    fr:'Ce navigateur est trop ancien. Ouvrez la même adresse dans Chrome, Edge ou Firefox, ou répondez dans la fenêtre noire du kit.',
+    it:'Questo browser è troppo vecchio. Apri lo stesso indirizzo in Chrome, Edge o Firefox, oppure rispondi nella finestra nera del kit.',
+    de:'Dieser Browser ist zu alt. Öffnen Sie dieselbe Adresse in Chrome, Edge oder Firefox – oder antworten Sie im schwarzen Fenster des Kits.',
+    lv:'Šis pārlūks ir pārāk vecs. Atveriet to pašu adresi Chrome, Edge vai Firefox, vai atbildiet rīka melnajā logā.',
+    pl:'Ta przeglądarka jest za stara. Otwórz ten sam adres w Chrome, Edge lub Firefox albo odpowiadaj w czarnym oknie zestawu.'
+  };
+  var l = ((navigator.language || navigator.userLanguage || 'en') + '').substring(0, 2).toLowerCase();
+  var t = M[l] || M.en;
+  document.write('<style>body>*{display:none!important}body>div.oldb{display:block!important}</style><div class="oldb" style="max-width:640px;margin:40px auto;padding:20px;font:16px/1.5 Segoe UI,Arial,sans-serif;background:#FFFAEB;border:1px solid #B54708;color:#111827">' +
+    '<b>phone-kit</b><br><br>' + t + '<br><br><code style="font-size:14px">' + location.href.replace(/</g, '&lt;') + '</code></div>');
+  window.__oldBrowser = true;
+})();
+</script>
 <header class="top">
   <div class="wrap">
     <div class="brand">
