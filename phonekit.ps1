@@ -551,13 +551,33 @@ function Get-Mdns {
   $r = Invoke-Adb @('mdns', 'services') 15
   $list = @()
   foreach ($l in (($r.Out + "`n" + $r.Err) -split "`n")) {
-    if ($l -match '^\s*(\S+)\s+_adb-tls-(pairing|connect)\._tcp\.?\s+(\d{1,3}(?:\.\d{1,3}){3}:\d{2,5})') {
-      $list += [pscustomobject]@{ Name = $Matches[1]; Kind = $Matches[2]; Addr = $Matches[3] }
+    if ($l -match '^\s*(\S+)\s+_adb-tls-(pairing|connect)\._tcp\.?\s+(\d{1,3}(?:\.\d{1,3}){3}):(\d{2,5})\b') {
+      # порт сопряжения/подключения у Android всегда большой (обычно 30000–45000); «:36» и т.п. — мусор из кэша mDNS
+      if ([int]$Matches[4] -lt 1024) { continue }
+      $list += [pscustomobject]@{ Name = $Matches[1]; Kind = $Matches[2]; Addr = ($Matches[3] + ':' + $Matches[4]) }
     }
   }
   return $list
 }
 
+# IPv4-адреса этого компьютера (чтобы заметить окно сопряжения из чужой сети)
+function Get-LocalIPv4 {
+  try {
+    return @([Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object { $_.OperationalStatus -eq 'Up' } |
+      ForEach-Object { $_.GetIPProperties().UnicastAddresses } | Where-Object { $_.Address.AddressFamily -eq 'InterNetwork' -and $_.Address.ToString() -notmatch '^127\.' } |
+      ForEach-Object { $m = '255.255.255.0'; try { if ($_.IPv4Mask) { $m = $_.IPv4Mask.ToString() } } catch {}; if ($m -eq '0.0.0.0') { $m = '255.255.255.0' }; [pscustomobject]@{ Ip = $_.Address.ToString(); Mask = $m } })
+  } catch { return @() }
+}
+function Test-SameNet([string]$addr, $local) {
+  if (-not $local -or @($local).Count -eq 0) { return $true }
+  $a = @(($addr -split ':')[0] -split '\.' | ForEach-Object { [int]$_ })
+  foreach ($l in $local) {
+    $b = @($l.Ip -split '\.' | ForEach-Object { [int]$_ }); $m = @($l.Mask -split '\.' | ForEach-Object { [int]$_ })
+    $same = $true; for ($i = 0; $i -lt 4; $i++) { if (($a[$i] -band $m[$i]) -ne ($b[$i] -band $m[$i])) { $same = $false } }
+    if ($same) { return $true }
+  }
+  return $false
+}
 function Test-Addr([string]$a) { return ($a -match '^\d{1,3}(\.\d{1,3}){3}:\d{2,5}$') }
 # Чистим ввод IP:порт: пробелы, запятые вместо точек, «IP 192.168.1.5 порт 41234»
 function Read-Addr([string]$q) {
@@ -730,6 +750,10 @@ function Pair-Wifi {
   Say (L 'm083')
   $found = @()
   for ($i = 0; $i -lt 3 -and $found.Count -eq 0; $i++) { $found = @(Get-Mdns | Where-Object { $_.Kind -eq 'pairing' }); if (-not $found.Count) { Start-Sleep -Seconds 2 } }
+  # окна из других сетей (старый кэш mDNS, второй адаптер) — в конец списка и не выбираем сами
+  $loc = Get-LocalIPv4
+  $found = @(@($found | Where-Object { Test-SameNet $_.Addr $loc }) + @($found | Where-Object { -not (Test-SameNet $_.Addr $loc) }))
+  if ($found.Count -ge 1 -and -not (Test-SameNet $found[0].Addr $loc)) { Warn (L 'p004' $found[0].Addr) }
   if ($found.Count -eq 1) { $pt = $found[0].Addr; Ok (L 'm084' $pt) }
   elseif ($found.Count -gt 1) {
     for ($i = 0; $i -lt $found.Count; $i++) { Say ("  {0}) {1}" -f ($i + 1), $found[$i].Addr) 'White' }
@@ -742,7 +766,16 @@ function Pair-Wifi {
     $pt = Read-Addr (L 'm088')
     if (-not $pt) { return $null }
   }
-  do { $code = Ask (L 'm089') 'code6' $null @{ addr = $pt } } until ($code -match '^\d{6}$')
+  # Код: можно вернуться назад (окна на телефоне нет / адрес не тот) или ввести адрес вручную
+  while ($true) {
+    Say (L 'p001' $pt) 'White'
+    Say (L 'p002') 'DarkGray'
+    $code = (Ask (L 'm089') 'code6' $null @{ addr = $pt; back = $true; other = $true }).Trim()
+    if ($code -match '^[QqЙйBbИи]$') { Say (L 'p003'); return $null }
+    if ($code -match '^[AaФф]$') { $n = Read-Addr (L 'm088'); if ($n) { $pt = $n }; continue }
+    $code = $code -replace '\D', ''
+    if ($code -match '^\d{6}$') { break }
+  }
   $r = Invoke-Adb @('pair', $pt, $code) 30
   $txt = ($r.Out + ' ' + $r.Err).Trim()
   if ($txt -notmatch 'Successfully paired') {
