@@ -44,3 +44,6 @@ jobs:
       - name: Веб-интерфейс в Windows PowerShell 5.1
         shell: pwsh
         run: python tests/webtest.py powershell
+      - name: Кнопка «Обновить» (самообновление) в Windows PowerShell 5.1
+        shell: pwsh
+        run: python tests/updtest.py powershell
