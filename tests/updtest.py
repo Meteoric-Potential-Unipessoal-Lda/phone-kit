@@ -3,6 +3,8 @@
 #    набор перезапускается уже версией 9.9 (в том же окне, остаток ввода получает новая версия).
 # Запуск: python3 tests/updtest.py [pwsh|powershell]   Код выхода 1 — ошибка.
 import hashlib, http.server, io, json, os, re, shutil, subprocess, sys, tempfile, threading, zipfile
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')   # Windows: консоль cp1252, а вывод по-русски
+except Exception: pass
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 shell = sys.argv[1] if len(sys.argv) > 1 else 'pwsh'
 cur = re.search(r"\$KitVersion = '([\d.]+)'", open(os.path.join(ROOT, 'phonekit.ps1'), encoding='utf-8-sig').read()).group(1)
