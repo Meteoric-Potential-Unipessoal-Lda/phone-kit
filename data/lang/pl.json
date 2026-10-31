@@ -692,5 +692,12 @@
  "ui_tag_junk": "śmieci",
  "ui_tag_move": "na komputer",
  "k047": "plików: {0}",
- "k048": "Śmieci są usuwane na stałe; to, co przeniesiono na komputer, można przywrócić „Cofaniem zmian”"
+ "k048": "Śmieci są usuwane na stałe; to, co przeniesiono na komputer, można przywrócić „Cofaniem zmian”",
+ "p001": "Na telefonie musi być otwarte okno „Sparuj urządzenie za pomocą kodu parowania”: 6 cyfr, a pod nimi adres {0}. Brak okna lub inny adres — wróć.",
+ "p002": "  Q — wstecz, A — wpisz adres ręcznie",
+ "p003": "Parowanie anulowane. Na telefonie: „Debugowanie bezprzewodowe” → „Sparuj urządzenie za pomocą kodu parowania”, potem znowu W.",
+ "p004": "Okno parowania {0} jest w innej sieci niż ten komputer (lub zostało z wcześniejszej próby). Sprawdź adres na telefonie.",
+ "ui_code_back": "Wstecz",
+ "ui_code_other": "Inny adres",
+ "ui_code_check": "Porównaj z adresem pod cyframi na telefonie. Brak okna z cyframi lub inny adres — „Wstecz”, a na telefonie otwórz „Debugowanie bezprzewodowe” → „Sparuj urządzenie za pomocą kodu parowania”."
 }

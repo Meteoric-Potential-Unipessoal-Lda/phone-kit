@@ -692,5 +692,12 @@
  "ui_tag_junk": "junk",
  "ui_tag_move": "to computer",
  "k047": "{0} files",
- "k048": "Junk is deleted for good; files moved to the computer can be returned with Rollback"
+ "k048": "Junk is deleted for good; files moved to the computer can be returned with Rollback",
+ "p001": "The phone must show the “Pair device with pairing code” window: 6 digits and the address {0} under them. No window or a different address — go back.",
+ "p002": "  Q — back, A — enter the address manually",
+ "p003": "Pairing cancelled. On the phone: “Wireless debugging” → “Pair device with pairing code”, then W again.",
+ "p004": "Pairing window {0} is on a different network than this computer (or left over from an earlier attempt). Check the address on the phone.",
+ "ui_code_back": "Back",
+ "ui_code_other": "Other address",
+ "ui_code_check": "Compare with the address under the digits on the phone. No window with digits or a different address — “Back”, then on the phone open “Wireless debugging” → “Pair device with pairing code”."
 }

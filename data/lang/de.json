@@ -692,5 +692,12 @@
  "ui_tag_junk": "Müll",
  "ui_tag_move": "auf Computer",
  "k047": "{0} Dateien",
- "k048": "Datenmüll wird endgültig gelöscht; auf den Computer Verschobenes lässt sich mit „Rückgängig“ zurückspielen"
+ "k048": "Datenmüll wird endgültig gelöscht; auf den Computer Verschobenes lässt sich mit „Rückgängig“ zurückspielen",
+ "p001": "Auf dem Telefon muss das Fenster „Gerät mit Kopplungscode koppeln“ offen sein: 6 Ziffern und darunter die Adresse {0}. Kein Fenster oder andere Adresse — zurück.",
+ "p002": "  Q — zurück, A — Adresse von Hand eingeben",
+ "p003": "Kopplung abgebrochen. Auf dem Telefon: „Debugging über WLAN“ → „Gerät mit Kopplungscode koppeln“, dann wieder W.",
+ "p004": "Kopplungsfenster {0} liegt in einem anderen Netz als dieser Computer (oder stammt von einem früheren Versuch). Adresse am Telefon prüfen.",
+ "ui_code_back": "Zurück",
+ "ui_code_other": "Andere Adresse",
+ "ui_code_check": "Mit der Adresse unter den Ziffern auf dem Telefon vergleichen. Kein Fenster mit Ziffern oder andere Adresse — „Zurück“, dann auf dem Telefon „Debugging über WLAN“ → „Gerät mit Kopplungscode koppeln“ öffnen."
 }

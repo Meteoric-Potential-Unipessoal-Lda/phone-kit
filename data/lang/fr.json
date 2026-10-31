@@ -692,5 +692,12 @@
  "ui_tag_junk": "inutile",
  "ui_tag_move": "vers l'ordinateur",
  "k047": "{0} fichiers",
- "k048": "Les fichiers inutiles sont supprimés définitivement ; ce qui est transféré vers l'ordinateur peut être remis avec « Restauration »"
+ "k048": "Les fichiers inutiles sont supprimés définitivement ; ce qui est transféré vers l'ordinateur peut être remis avec « Restauration »",
+ "p001": "Le téléphone doit afficher la fenêtre « Associer l'appareil avec un code d'association » : 6 chiffres et en dessous l'adresse {0}. Pas de fenêtre ou adresse différente — revenez en arrière.",
+ "p002": "  Q — retour, A — saisir l'adresse manuellement",
+ "p003": "Association annulée. Sur le téléphone : « Débogage sans fil » → « Associer l'appareil avec un code d'association », puis à nouveau W.",
+ "p004": "La fenêtre d'association {0} est sur un autre réseau que cet ordinateur (ou reste d'une tentative précédente). Vérifiez l'adresse sur le téléphone.",
+ "ui_code_back": "Retour",
+ "ui_code_other": "Autre adresse",
+ "ui_code_check": "Comparez avec l'adresse sous les chiffres sur le téléphone. Pas de fenêtre avec des chiffres ou adresse différente — « Retour », puis sur le téléphone ouvrez « Débogage sans fil » → « Associer l'appareil avec un code d'association »."
 }

@@ -692,5 +692,12 @@
  "ui_tag_junk": "basura",
  "ui_tag_move": "al ordenador",
  "k047": "{0} archivos",
- "k048": "La basura se borra para siempre; lo pasado al ordenador se puede devolver con «Revertir»"
+ "k048": "La basura se borra para siempre; lo pasado al ordenador se puede devolver con «Revertir»",
+ "p001": "El teléfono debe mostrar la ventana «Vincular dispositivo con código de sincronización»: 6 dígitos y debajo la dirección {0}. Si no hay ventana o la dirección es otra, vuelva atrás.",
+ "p002": "  Q — atrás, A — escribir la dirección a mano",
+ "p003": "Vinculación cancelada. En el teléfono: «Depuración inalámbrica» → «Vincular dispositivo con código de sincronización» y luego W otra vez.",
+ "p004": "La ventana de vinculación {0} es de otra red distinta a la de este ordenador (o quedó de un intento anterior). Comprueba la dirección en el teléfono.",
+ "ui_code_back": "Atrás",
+ "ui_code_other": "Otra dirección",
+ "ui_code_check": "Compárala con la dirección bajo los dígitos en el teléfono. Si no hay ventana con dígitos o la dirección es otra, «Atrás» y en el teléfono abre «Depuración inalámbrica» → «Vincular dispositivo con código de sincronización»."
 }

@@ -692,5 +692,12 @@
  "ui_tag_junk": "drazas",
  "ui_tag_move": "uz datoru",
  "k047": "{0} faili",
- "k048": "Drazas tiek dzēstas neatgriezeniski; uz datoru pārnesto var atgriezt ar «Atsaukšana»"
+ "k048": "Drazas tiek dzēstas neatgriezeniski; uz datoru pārnesto var atgriezt ar «Atsaukšana»",
+ "p001": "Tālrunī jābūt atvērtam logam „Ierīču savienošana pārī, izmantojot kodu”: 6 cipari un zem tiem adrese {0}. Ja loga nav vai adrese cita — atpakaļ.",
+ "p002": "  Q — atpakaļ, A — ievadīt adresi manuāli",
+ "p003": "Savienošana atcelta. Tālrunī: „Bezvadu atkļūdošana” → „Ierīču savienošana pārī, izmantojot kodu”, tad atkal W.",
+ "p004": "Savienošanas logs {0} ir citā tīklā nekā šis dators (vai palicis no iepriekšējā mēģinājuma). Pārbaudi adresi tālrunī.",
+ "ui_code_back": "Atpakaļ",
+ "ui_code_other": "Cita adrese",
+ "ui_code_check": "Salīdzini ar adresi zem cipariem tālrunī. Ja loga ar cipariem nav vai adrese cita — „Atpakaļ”, tad tālrunī atver „Bezvadu atkļūdošana” → „Ierīču savienošana pārī, izmantojot kodu”."
 }

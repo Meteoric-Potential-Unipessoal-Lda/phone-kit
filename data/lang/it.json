@@ -692,5 +692,12 @@
  "ui_tag_junk": "spazzatura",
  "ui_tag_move": "sul computer",
  "k047": "{0} file",
- "k048": "La spazzatura viene eliminata per sempre; ciò che è spostato sul computer si può riportare con «Ripristino»"
+ "k048": "La spazzatura viene eliminata per sempre; ciò che è spostato sul computer si può riportare con «Ripristino»",
+ "p001": "Sul telefono deve essere aperta la finestra «Accoppia dispositivo con codice di accoppiamento»: 6 cifre e sotto l'indirizzo {0}. Nessuna finestra o indirizzo diverso — torna indietro.",
+ "p002": "  Q — indietro, A — inserire l'indirizzo a mano",
+ "p003": "Accoppiamento annullato. Sul telefono: «Debug wireless» → «Accoppia dispositivo con codice di accoppiamento», poi di nuovo W.",
+ "p004": "La finestra di accoppiamento {0} è su una rete diversa da questo computer (o è rimasta da un tentativo precedente). Controlla l'indirizzo sul telefono.",
+ "ui_code_back": "Indietro",
+ "ui_code_other": "Altro indirizzo",
+ "ui_code_check": "Confronta con l'indirizzo sotto le cifre sul telefono. Nessuna finestra con cifre o indirizzo diverso — «Indietro» e sul telefono apri «Debug wireless» → «Accoppia dispositivo con codice di accoppiamento»."
 }

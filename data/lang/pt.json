@@ -692,5 +692,12 @@
  "ui_tag_junk": "lixo",
  "ui_tag_move": "para o computador",
  "k047": "{0} ficheiros",
- "k048": "O lixo é apagado de vez; o que foi passado para o computador pode ser reposto com «Reverter»"
+ "k048": "O lixo é apagado de vez; o que foi passado para o computador pode ser reposto com «Reverter»",
+ "p001": "O telemóvel tem de mostrar a janela «Sincronizar dispositivo com código de sincronização»: 6 dígitos e, por baixo, o endereço {0}. Sem janela ou endereço diferente — volte atrás.",
+ "p002": "  Q — voltar, A — introduzir o endereço manualmente",
+ "p003": "Sincronização cancelada. No telemóvel: «Depuração sem fios» → «Sincronizar dispositivo com código de sincronização» e depois W outra vez.",
+ "p004": "A janela de sincronização {0} é de outra rede que não a deste computador (ou ficou de uma tentativa anterior). Confira o endereço no telemóvel.",
+ "ui_code_back": "Voltar",
+ "ui_code_other": "Outro endereço",
+ "ui_code_check": "Compare com o endereço por baixo dos dígitos no telemóvel. Sem janela com dígitos ou endereço diferente — «Voltar» e, no telemóvel, abra «Depuração sem fios» → «Sincronizar dispositivo com código de sincronização»."
 }
