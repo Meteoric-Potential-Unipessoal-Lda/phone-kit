@@ -140,5 +140,8 @@ if pwsh -NoProfile -File "$ROOT/tests/usbtest.ps1"; then echo "PASS usbtest"; el
 # 8. Веб-интерфейс: сервер, ответы по HTTP, смена языка на ходу, отчёт
 if python3 "$ROOT/tests/webtest.py" pwsh; then :; else FAIL=1; fi
 
+# 9. Кнопка «Обновить»: неверная SHA-256 -> отказ; верная -> файлы заменены, перезапуск новой версией
+if python3 "$ROOT/tests/updtest.py" pwsh; then :; else FAIL=1; fi
+
 if [ $FAIL -ne 0 ]; then echo "=== ЕСТЬ ОШИБКИ, логи: $WORK"; for f in "$WORK"/*.log; do echo "----- $f"; tail -40 "$f"; done; exit 1; fi
 echo "=== ВСЕ ТЕСТЫ ПРОШЛИ"
