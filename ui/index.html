@@ -210,6 +210,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     diag: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
     opt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
     undo: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+    mem: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
     phone: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
     check: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>',
     tick: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>'
@@ -282,7 +283,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     else if (q.kind === 'menu') h = qMenu(q, opts);
     else if (q.kind === 'confirm') h = '<div class="card pad" style="display:flex;flex-direction:column;gap:16px;border-color:#93B4FF;box-shadow:0 0 0 3px #E0E9FF"><h2>' + esc(cleanPrompt(q.prompt)) + '</h2><div class="row"><button type="button" class="btn btn-primary" data-v="yes">' + esc(T('ui_yes')) + '</button><button type="button" class="btn btn-ghost" data-v="">' + esc(T('ui_no')) + '</button></div></div>';
     else if (q.kind === 'code6') h = qCode(q, ex);
-    else if (q.kind === 'plan') h = qPlan(ex.items || []);
+    else if (q.kind === 'plan') h = qPlan(ex.items || [], ex);
     else if (q.kind === 'pick') h = qPick(ex.items || []);
     else if (q.kind === 'text' || q.kind === 'addr') h = qText(q, ex);
     else h = '<div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2>' + esc(cleanPrompt(q.prompt)) + '</h2><div class="row"><button type="button" class="btn btn-primary" data-v="">' + esc(T('ui_next')) + '</button></div></div>';
@@ -290,7 +291,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     wireQuestion(q);
   }
   function qStart(opts) {
-    var info = { '1': ['diag', 'ui_m1_t', 'ui_m1_d'], '2': ['opt', 'ui_m2_t', 'ui_m2_d'], '3': ['undo', 'ui_m3_t', 'ui_m3_d'] }, h = '';
+    var info = { '1': ['diag', 'ui_m1_t', 'ui_m1_d'], '2': ['opt', 'ui_m2_t', 'ui_m2_d'], '3': ['undo', 'ui_m3_t', 'ui_m3_d'], '4': ['mem', 'ui_m4_t', 'ui_m4_d'] }, h = '';
     for (var i = 0; i < opts.length; i++) {
       var o = opts[i], f = info[o.key]; if (!f) continue;
       h += '<button type="button" class="choice' + (o.key === '2' ? ' main' : '') + '" data-v="' + esc(o.key) + '"><span class="ico">' + ICON[f[0]] + '</span><b>' + esc(T(f[1])) + '</b><span>' + esc(T(f[2])) + '</span></button>';
@@ -335,10 +336,12 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     if (it.kind === 'disable' && TAGS[it.tier]) return TAGS[it.tier];
     if (it.kind === 'third') return ['ui_tag_sec', '#FFFAEB', '#B54708'];
     if (it.kind === 'bg') return ['ui_tag_bg', '#F2F4F7', '#344054'];
+    if (it.kind === 'junk' || it.kind === 'cache' || it.kind === 'apk') return ['ui_tag_junk', '#FEF3F2', '#B42318'];
+    if (it.kind === 'move' || it.kind === 'big') return ['ui_tag_move', '#EFF8FF', '#175CD3'];
     return ['ui_tag_set', '#F2F4F7', '#344054'];
   }
-  function qPlan(items) {
-    S.planItems = items; S.sel = {};
+  function qPlan(items, ex) {
+    S.planItems = items; S.sel = {}; S.planEx = ex || {};
     for (var i = 0; i < items.length; i++) S.sel[items[i].n] = !!items[i].on;
     return '<div id="plan" style="display:flex;flex-direction:column;gap:20px"></div>';
   }
@@ -346,10 +349,13 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     var el = $('plan'); if (!el) return;
     var items = S.planItems || [], groups = [], gi = {}, i;
     for (i = 0; i < items.length; i++) { var g = items[i].group || T('ui_g_other'); if (!(g in gi)) { gi[g] = groups.length; groups.push({ title: g, items: [] }); } groups[gi[g]].items.push(items[i]); }
-    var h = '<div><h1>' + esc(T('ui_plan_t')) + '</h1><p class="lead">' + esc(T('ui_plan_d')) + '</p></div>';
-    h += '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><div class="row" style="gap:12px"><b>' + esc(T('ui_prof')) + '</b><div class="chips">';
-    for (var pi = 0; pi < PROFILES.length; pi++) h += '<button type="button" class="chipbtn' + (S.prof === PROFILES[pi] ? ' on' : '') + '" data-prof="' + PROFILES[pi] + '">' + esc(T('ui_p_' + PROFILES[pi])) + '</button>';
-    h += '</div></div><p class="sub">' + esc(T('ui_p_' + (S.prof || 'std') + '_d')) + '</p></div>';
+    var PX = S.planEx || {};
+    var h = '<div><h1>' + esc(PX.title || T('ui_plan_t')) + '</h1><p class="lead">' + esc(PX.lead || T('ui_plan_d')) + '</p></div>';
+    if (!PX.noprof) {
+      h += '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><div class="row" style="gap:12px"><b>' + esc(T('ui_prof')) + '</b><div class="chips">';
+      for (var pi = 0; pi < PROFILES.length; pi++) h += '<button type="button" class="chipbtn' + (S.prof === PROFILES[pi] ? ' on' : '') + '" data-prof="' + PROFILES[pi] + '">' + esc(T('ui_p_' + PROFILES[pi])) + '</button>';
+      h += '</div></div><p class="sub">' + esc(T('ui_p_' + (S.prof || 'std') + '_d')) + '</p></div>';
+    }
     for (var k = 0; k < groups.length; k++) {
       var G = groups[k], on = 0, rows = '';
       for (i = 0; i < G.items.length; i++) {
@@ -362,7 +368,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
       h += '<section class="card group"><div class="ghead"><div class="row"><h2 style="font-size:17px">' + esc(G.title) + '</h2><span class="cnt">' + on + ' / ' + G.items.length + '</span></div><div class="row" style="gap:6px"><button type="button" class="btn btn-ghost btn-sm" data-gall="' + k + '">' + esc(T('ui_all')) + '</button><button type="button" class="btn btn-ghost btn-sm" data-gnone="' + k + '">' + esc(T('ui_none')) + '</button></div></div>' + rows + '</section>';
     }
     var cnt = 0; for (i = 0; i < items.length; i++) if (S.sel[items[i].n]) cnt++;
-    h += '<div class="sticky"><div class="dock"><div style="flex:1 1 260px;display:flex;flex-wrap:wrap;gap:6px 20px;align-items:baseline"><span class="big">' + cnt + '</span><span class="s">' + esc(T('ui_selected')) + '</span><span class="s2">' + esc(T('ui_rev')) + '</span></div>' +
+    h += '<div class="sticky"><div class="dock"><div style="flex:1 1 260px;display:flex;flex-wrap:wrap;gap:6px 20px;align-items:baseline"><span class="big">' + cnt + '</span><span class="s">' + esc(T('ui_selected')) + '</span><span class="s2">' + esc(PX.rev || T('ui_rev')) + '</span></div>' +
       '<button type="button" class="btn" style="color:#CBD5E1" id="planquit">' + esc(T('ui_quit_noch')) + '</button><button type="button" class="btn" style="background:#fff;color:#0F172A" id="plango"' + (cnt ? '' : ' disabled') + '>' + esc(T('ui_run')) + ' →</button></div></div>';
     var y = window.scrollY; el.innerHTML = h; window.scrollTo(0, y);
     el.onclick = function (e) {
@@ -448,7 +454,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     } else if (S.stage === 'diag' || (S.summary && (S.stage === 'plan' || (S.stage === 'done' && S.mode === 'diag')))) {
       if (!S.summary) {
         var last = S.log.length ? S.log[S.log.length - 1].t : '';
-        h += '<div class="card pad" style="display:flex;gap:16px;align-items:center"><div class="spinner"></div><div><h2>' + esc(T('ui_diag_t')) + '</h2><p style="color:var(--muted)">' + esc(T('ui_diag_wait')) + '</p><p class="sub mono" style="margin-top:6px">' + esc(String(last).trim()) + '</p></div></div>';
+        h += '<div class="card pad" style="display:flex;gap:16px;align-items:center"><div class="spinner"></div><div><h2>' + esc(T(S.mode === 'storage' ? 'ui_m4_t' : 'ui_diag_t')) + '</h2><p style="color:var(--muted)">' + esc(T('ui_diag_wait')) + '</p><p class="sub mono" style="margin-top:6px">' + esc(String(last).trim()) + '</p></div></div>';
       } else {
         h += diagHtml(S.summary);
       }
@@ -460,10 +466,11 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
       h += '<section class="card"><div class="logbox" style="max-height:none">'; for (var j = 0; j < lines.length; j++) h += logHtml(lines[j]); h += '</div></section>';
     }
     if (S.stage === 'done' && S.report) {
-      var msg = S.mode === 'opt' ? 'ui_done_opt' : (S.mode === 'restore' ? 'ui_done_restore' : 'ui_done_diag');
+      var msg = S.mode === 'opt' ? 'ui_done_opt' : (S.mode === 'restore' ? 'ui_done_restore' : (S.mode === 'storage' ? 'ui_done_mem' : 'ui_done_diag'));
       var dh = '<div class="card pad" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div class="big-ok">' + ICON.check + '</div><div style="flex:1 1 280px"><h1>' + esc(T('ui_done_t')) + '</h1><p class="lead">' + esc(T(msg)) + '</p>' +
         (S.mode === 'opt' && S.report.journal ? '<p class="sub" style="margin-top:6px">' + esc(T('ui_journal_n', S.report.journal)) + '</p>' : '') + '</div></div>' +
         compareHtml(S.compare) +
+        (S.report.dest ? '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_copies')) + '</h2><p class="mono" style="overflow-wrap:anywhere">' + esc(S.report.dest) + '</p><p class="sub">' + esc(T('ui_copies_d')) + '</p></div>' : '') +
         (S.client ? '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_client')) + '</h2><p class="sub">' + esc(T('ui_client_d')) + '</p><div class="row"><a class="btn btn-primary" target="_blank" rel="noopener" href="/api/client?t=' + TOKEN + '&amp;r=' + S.seq + '">' + esc(T('ui_client')) + ' ↗</a></div></div>' : '') +
         '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_report')) + '</h2><p class="mono" style="overflow-wrap:anywhere">' + esc(S.report.zip) + '</p><p class="sub">' + esc(T('ui_report_d')) + '</p>' +
         (S.finished ? '<div class="row"><button type="button" class="btn btn-primary" id="closebtn">' + esc(T('ui_close')) + '</button></div>' : '') + '</div>';
