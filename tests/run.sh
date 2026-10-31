@@ -16,7 +16,7 @@ run() {
   cp "$ROOT/phonekit.ps1" "$kit/"; cp "$ROOT"/data/*.tsv "$kit/data/"; mkdir -p "$kit/data/lang"; cp "$ROOT"/data/lang/*.json "$kit/data/lang/"
   export MOCK_BRAND=$brand MOCK_STATE="$WORK/$brand.json"
   [ -z "$keep" ] && rm -f "$MOCK_STATE"
-  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoUpdateCheck -NoPause > "$WORK/$name.log" 2>&1
+  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoUpdateCheck -NoPause ${KIT_ARGS:-} > "$WORK/$name.log" 2>&1
 }
 # expect NAME "текст" — текст должен быть в выводе; reject NAME "текст" — не должен
 expect() { if grep -qF -- "$2" "$WORK/$1.log"; then echo "PASS $1: $2"; else echo "FAIL $1: нет «$2»"; FAIL=1; fi; }
@@ -93,6 +93,40 @@ MOCK_WIFI=1 run w_reboot xiaomi '2\nТ\nw\n123456\n\nда\n\nда\n123456\n'
 expect w_reboot 'вижу окно сопряжения на телефоне'
 expect w_reboot 'Сопряжение прошло, подключаюсь'
 expect w_reboot 'после перезагрузки всё отключённое осталось отключённым'
+
+# 6в. Память телефона (пункт 4): мусор удаляется сразу; перенос — копия на «компьютер», проверка размера, только потом удаление;
+#     файл с апострофом в имени копируется, но с телефона не удаляется; оборванная копия (BROKEN*) остаётся на телефоне; затем откат заливает обратно
+SD="$WORK/sdcard"; CP="$WORK/copies"; rm -rf "$SD" "$CP"
+mk() { mkdir -p "$(dirname "$SD/$1")"; head -c "$2" /dev/urandom > "$SD/$1"; }
+mk 'DCIM/Camera/IMG_0001.jpg' 900000; mk 'DCIM/Camera/IMG 0002 копия.jpg' 400000; mk "DCIM/Camera/it's.jpg" 50000; mk 'DCIM/Camera/BROKEN_0003.jpg' 100000
+mk 'DCIM/.thumbnails/t1.jpg' 200000; mk 'Download/app-release.apk' 300000; mk 'Download/doc.pdf' 100000; mk 'Download/film.mkv' 3200000
+mk 'Android/data/org.telegram.messenger/cache/c1' 500000; mk 'Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-1.jpg' 1100000
+MOCK_SDCARD="$SD" KIT_ARGS="-CopyTo $CP -BigMb 2" run st_mem samsung '4\nТест\n4 5 7\n\nда\n'
+expect st_mem 'Удалено: Миниатюры галереи'
+expect st_mem 'Удалено: Кэш Telegram'
+expect st_mem 'Установочные файлы .apk'
+expect st_mem 'film.mkv'
+expect st_mem 'с телефона удалены'
+expect st_mem 'не скопировались'
+expect st_mem 'необычными символами'
+expect st_mem 'Освобождено на телефоне'
+reject st_mem 'Exception'
+fs() { if [ $1 "$2" ]; then echo "PASS st_mem: $3"; else echo "FAIL st_mem: $3"; FAIL=1; fi; }
+fs '! -e' "$SD/DCIM/.thumbnails" 'миниатюры удалены'
+fs '! -e' "$SD/Android/data/org.telegram.messenger/cache" 'кэш Telegram удалён'
+fs '! -e' "$SD/Download/app-release.apk" 'apk удалён'
+fs '-e' "$SD/Download/doc.pdf" 'загрузки не тронуты'
+fs '! -e' "$SD/DCIM/Camera/IMG_0001.jpg" 'фото перенесено'
+fs '! -e' "$SD/DCIM/Camera/IMG 0002 копия.jpg" 'фото с пробелом и кириллицей перенесено'
+fs '-e' "$SD/DCIM/Camera/it's.jpg" 'имя с апострофом осталось на телефоне'
+fs '-e' "$SD/DCIM/Camera/BROKEN_0003.jpg" 'оборванная копия -> файл остался на телефоне'
+D=$(ls -d "$CP"/*/ 2>/dev/null | head -1)
+fs '-e' "${D}DCIM/Camera/IMG_0001.jpg" 'копия на компьютере'
+fs '-e' "${D}Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-1.jpg" 'копия WhatsApp на компьютере'
+cmp -s "${D}DCIM/Camera/IMG 0002 копия.jpg" /dev/null; [ -s "${D}DCIM/Camera/IMG 0002 копия.jpg" ] && echo "PASS st_mem: копия не пустая" || { echo "FAIL st_mem: копия пустая"; FAIL=1; }
+MOCK_SDCARD="$SD" run st_rest samsung '3\n\n\nда\n' keep
+expect st_rest 'Возвращено на телефон: 2 файлов'
+[ -e "$SD/DCIM/Camera/IMG_0001.jpg" ] && [ -e "$SD/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-1.jpg" ] && echo "PASS st_rest: файлы вернулись" || { echo "FAIL st_rest: файлы не вернулись"; FAIL=1; }
 
 # 7. Пункт U на подставных данных Windows
 if pwsh -NoProfile -File "$ROOT/tests/usbtest.ps1"; then echo "PASS usbtest"; else echo "FAIL usbtest"; FAIL=1; fi

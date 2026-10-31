@@ -2,7 +2,44 @@
 # Подставной adb для тестов phone-kit: эмулирует Samsung Galaxy A10 (MOCK_BRAND=samsung) или Redmi на HyperOS (xiaomi).
 # Флаги: MOCK_WIFI (сопряжение по коду 123456), MOCK_NOMDNS, MOCK_OFFLINE, MOCK_BREAK=<пакет> (ломает рабочий стол), MOCK_DNSBROKEN.
 # Mock adb for phone-kit tests. Brand via MOCK_BRAND=samsung|xiaomi. State in MOCK_STATE json.
-import sys, os, json
+import sys, os, json, shlex, shutil
+SD = os.environ.get('MOCK_SDCARD')   # папка на диске вместо /sdcard (пункт 4: find/stat/du/rm/pull/push)
+def lp(p): return os.path.join(SD, p[len('/sdcard/'):].lstrip('/')) if p.startswith('/sdcard') else None
+def kb(path):
+    if os.path.isfile(path): return (os.path.getsize(path) + 1023) // 1024
+    t = 0
+    for r, ds, fs in os.walk(path):
+        for f in fs: t += (os.path.getsize(os.path.join(r, f)) + 1023) // 1024
+    return max(t, 4)
+def sd_shell(cmd):
+    a = shlex.split(cmd)
+    if a[:3] == ['du', '-s', '-k']:
+        return '\n'.join('%d\t%s' % (kb(lp(x)), x) for x in a[3:] if os.path.exists(lp(x)))
+    if a[0] == 'find' and '-exec' in a:
+        root = a[1]; base = lp(root); mn = 0
+        if '-size' in a: mn = int(a[a.index('-size') + 1].strip('+M')) * 1048576
+        out = []
+        if os.path.isdir(base):
+            for r, ds, fs in os.walk(base):
+                for f in fs:
+                    full = os.path.join(r, f); sz = os.path.getsize(full)
+                    if sz > mn:
+                        rel = os.path.relpath(full, base).replace(os.sep, '/')
+                        out.append('%d %d %s' % (sz, int(os.path.getmtime(full)), root + ('' if root.endswith('/') else '/') + rel))
+        return '\n'.join(out)
+    if a[:2] == ['rm', '-rf']:
+        for x in a[2:]: shutil.rmtree(lp(x), ignore_errors=True)
+        return ''
+    if a[:2] == ['rm', '-f']:
+        for x in a[2:]:
+            if os.path.isfile(lp(x)): os.remove(lp(x))
+        return ''
+    if a[:2] == ['mkdir', '-p']:
+        os.makedirs(lp(a[2]), exist_ok=True); return ''
+    if a[:3] == ['df', '-k', '/data']:
+        used = sum(kb(os.path.join(SD, d)) for d in os.listdir(SD))
+        return 'Filesystem 1K-blocks Used Available Use%% Mounted on\n/dev/block/dm-5 30000000 %d %d 50%% /data' % (used, 30000000 - used)
+    return None
 brand = os.environ.get('MOCK_BRAND', 'samsung')
 SF = os.environ.get('MOCK_STATE', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mockstate.json'))
 SERIAL = 'R58N123ABC' if brand == 'samsung' else 'a1b2c3d4'
@@ -49,6 +86,9 @@ def installed(): return [p for p in allp if p not in st['uninst']]
 def plist(ps): return '\n'.join('package:' + p for p in ps)
 
 def shell(cmd):
+    if SD:
+        r = sd_shell(cmd)
+        if r is not None: return r
     a = cmd.split()
     if cmd == 'getprop':
         return '\n'.join('[%s]: [%s]' % kv for kv in props.items()) + '\n[sys.boot_completed]: [1]'
@@ -174,4 +214,16 @@ if c == 'devices': print('List of devices attached\n%s\t%s\n' % (SERIAL, 'offlin
 if c == 'mdns': print('List of discovered mdns services'); sys.exit(0)
 if c == 'shell':
     print(shell(' '.join(args[1:]))); sys.exit(0)
+if c == 'pull' and SD:
+    srcs = [x for x in args[1:-1] if x != '-a']; dst = args[-1]; n = 0
+    for x in srcs:
+        if os.path.isfile(lp(x)):
+            if os.path.basename(x).startswith('BROKEN'):   # имитация обрыва: файл скопировался не целиком
+                open(os.path.join(dst, os.path.basename(x)), 'wb').write(b'x'); continue
+            shutil.copy2(lp(x), os.path.join(dst, os.path.basename(x))); n += 1
+    print('%s: %d files pulled, 0 skipped.' % (srcs[0] if srcs else '', n)); sys.exit(0)
+if c == 'push' and SD:
+    srcs = args[1:-1]; dst = args[-1]; n = 0
+    for x in srcs: shutil.copy2(x, os.path.join(lp(dst), os.path.basename(x))); n += 1
+    print('%d files pushed, 0 skipped.' % n); sys.exit(0)
 print('mock: unknown ' + ' '.join(args)); sys.exit(1)
