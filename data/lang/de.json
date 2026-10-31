@@ -699,5 +699,19 @@
  "p004": "Kopplungsfenster {0} liegt in einem anderen Netz als dieser Computer (oder stammt von einem früheren Versuch). Adresse am Telefon prüfen.",
  "ui_code_back": "Zurück",
  "ui_code_other": "Andere Adresse",
- "ui_code_check": "Mit der Adresse unter den Ziffern auf dem Telefon vergleichen. Kein Fenster mit Ziffern oder andere Adresse — „Zurück“, dann auf dem Telefon „Debugging über WLAN“ → „Gerät mit Kopplungscode koppeln“ öffnen."
+ "ui_code_check": "Mit der Adresse unter den Ziffern auf dem Telefon vergleichen. Kein Fenster mit Ziffern oder andere Adresse — „Zurück“, dann auf dem Telefon „Debugging über WLAN“ → „Gerät mit Kopplungscode koppeln“ öffnen.",
+ "u010": "  U) Kit auf Version {0} aktualisieren",
+ "u011": "Aktualisierung auf Version {0}",
+ "u012": "Aktualisierung fehlgeschlagen: {0}",
+ "u013": "  Von Hand herunterladen: {0}. Das Kit läuft mit der bisherigen Version weiter.",
+ "u014": "Neue Version wird von GitHub geladen...",
+ "u015": "Prüfsumme stimmt nicht ({0}) — Datei beschädigt oder verändert; nichts geändert",
+ "u016": "SHA-256-Prüfsumme stimmt",
+ "u017": "Kit auf Version {0} aktualisiert ({1} Dateien)",
+ "u018": "  Die bisherigen Kit-Dateien liegen in {0}",
+ "u019": "Kit wird mit der neuen Version neu gestartet...",
+ "ui_update_do": "Aktualisieren",
+ "ui_update_dl": "phone-kit {0} wird geladen…",
+ "ui_update_fail": "Aktualisierung fehlgeschlagen: {0}",
+ "ui_update_restart": "Auf {0} aktualisiert. Das Kit startet neu — die Seite lädt sich in ein paar Sekunden selbst neu."
 }

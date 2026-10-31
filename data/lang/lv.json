@@ -699,5 +699,19 @@
  "p004": "Savienošanas logs {0} ir citā tīklā nekā šis dators (vai palicis no iepriekšējā mēģinājuma). Pārbaudi adresi tālrunī.",
  "ui_code_back": "Atpakaļ",
  "ui_code_other": "Cita adrese",
- "ui_code_check": "Salīdzini ar adresi zem cipariem tālrunī. Ja loga ar cipariem nav vai adrese cita — „Atpakaļ”, tad tālrunī atver „Bezvadu atkļūdošana” → „Ierīču savienošana pārī, izmantojot kodu”."
+ "ui_code_check": "Salīdzini ar adresi zem cipariem tālrunī. Ja loga ar cipariem nav vai adrese cita — „Atpakaļ”, tad tālrunī atver „Bezvadu atkļūdošana” → „Ierīču savienošana pārī, izmantojot kodu”.",
+ "u010": "  U) Atjaunināt rīku uz versiju {0}",
+ "u011": "Atjaunināšana uz versiju {0}",
+ "u012": "Neizdevās atjaunināt: {0}",
+ "u013": "  Lejupielādē manuāli: {0}. Rīks turpina strādāt ar pašreizējo versiju.",
+ "u014": "Lejupielādēju jauno versiju no GitHub...",
+ "u015": "kontrolsumma nesakrīt ({0}) — fails bojāts vai aizstāts; neko nemainu",
+ "u016": "SHA-256 kontrolsumma sakrīt",
+ "u017": "Rīks atjaunināts uz versiju {0} (failu: {1})",
+ "u018": "  Iepriekšējie rīka faili saglabāti mapē {0}",
+ "u019": "Restartēju rīku ar jauno versiju...",
+ "ui_update_do": "Atjaunināt",
+ "ui_update_dl": "Lejupielādēju phone-kit {0}…",
+ "ui_update_fail": "Neizdevās atjaunināt: {0}",
+ "ui_update_restart": "Atjaunināts uz {0}. Rīks restartējas — lapa pati atsvaidzināsies pēc dažām sekundēm."
 }

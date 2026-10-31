@@ -699,5 +699,19 @@
  "p004": "La ventana de vinculación {0} es de otra red distinta a la de este ordenador (o quedó de un intento anterior). Comprueba la dirección en el teléfono.",
  "ui_code_back": "Atrás",
  "ui_code_other": "Otra dirección",
- "ui_code_check": "Compárala con la dirección bajo los dígitos en el teléfono. Si no hay ventana con dígitos o la dirección es otra, «Atrás» y en el teléfono abre «Depuración inalámbrica» → «Vincular dispositivo con código de sincronización»."
+ "ui_code_check": "Compárala con la dirección bajo los dígitos en el teléfono. Si no hay ventana con dígitos o la dirección es otra, «Atrás» y en el teléfono abre «Depuración inalámbrica» → «Vincular dispositivo con código de sincronización».",
+ "u010": "  U) Actualizar el kit a la versión {0}",
+ "u011": "Actualización a la versión {0}",
+ "u012": "No se pudo actualizar: {0}",
+ "u013": "  Descárgalo a mano: {0}. El kit sigue con la versión actual.",
+ "u014": "Descargando la nueva versión de GitHub...",
+ "u015": "la suma de comprobación no coincide ({0}): archivo dañado o alterado; no cambio nada",
+ "u016": "la suma SHA-256 coincide",
+ "u017": "Kit actualizado a la versión {0} ({1} archivos)",
+ "u018": "  Los archivos anteriores del kit están guardados en {0}",
+ "u019": "Reiniciando el kit con la nueva versión...",
+ "ui_update_do": "Actualizar",
+ "ui_update_dl": "Descargando phone-kit {0}…",
+ "ui_update_fail": "No se pudo actualizar: {0}",
+ "ui_update_restart": "Actualizado a {0}. El kit se está reiniciando: la página se recargará sola en unos segundos."
 }

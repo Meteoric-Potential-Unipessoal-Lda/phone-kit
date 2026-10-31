@@ -699,5 +699,19 @@
  "p004": "La finestra di accoppiamento {0} è su una rete diversa da questo computer (o è rimasta da un tentativo precedente). Controlla l'indirizzo sul telefono.",
  "ui_code_back": "Indietro",
  "ui_code_other": "Altro indirizzo",
- "ui_code_check": "Confronta con l'indirizzo sotto le cifre sul telefono. Nessuna finestra con cifre o indirizzo diverso — «Indietro» e sul telefono apri «Debug wireless» → «Accoppia dispositivo con codice di accoppiamento»."
+ "ui_code_check": "Confronta con l'indirizzo sotto le cifre sul telefono. Nessuna finestra con cifre o indirizzo diverso — «Indietro» e sul telefono apri «Debug wireless» → «Accoppia dispositivo con codice di accoppiamento».",
+ "u010": "  U) Aggiorna il kit alla versione {0}",
+ "u011": "Aggiornamento alla versione {0}",
+ "u012": "Aggiornamento non riuscito: {0}",
+ "u013": "  Scaricala a mano: {0}. Il kit resta alla versione attuale.",
+ "u014": "Scarico la nuova versione da GitHub...",
+ "u015": "il checksum non corrisponde ({0}): file danneggiato o alterato, non cambio nulla",
+ "u016": "il checksum SHA-256 corrisponde",
+ "u017": "Kit aggiornato alla versione {0} ({1} file)",
+ "u018": "  I file precedenti del kit sono salvati in {0}",
+ "u019": "Riavvio il kit con la nuova versione...",
+ "ui_update_do": "Aggiorna",
+ "ui_update_dl": "Scarico phone-kit {0}…",
+ "ui_update_fail": "Aggiornamento non riuscito: {0}",
+ "ui_update_restart": "Aggiornato a {0}. Il kit si sta riavviando: la pagina si ricaricherà da sola tra pochi secondi."
 }

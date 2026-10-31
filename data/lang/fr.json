@@ -699,5 +699,19 @@
  "p004": "La fenêtre d'association {0} est sur un autre réseau que cet ordinateur (ou reste d'une tentative précédente). Vérifiez l'adresse sur le téléphone.",
  "ui_code_back": "Retour",
  "ui_code_other": "Autre adresse",
- "ui_code_check": "Comparez avec l'adresse sous les chiffres sur le téléphone. Pas de fenêtre avec des chiffres ou adresse différente — « Retour », puis sur le téléphone ouvrez « Débogage sans fil » → « Associer l'appareil avec un code d'association »."
+ "ui_code_check": "Comparez avec l'adresse sous les chiffres sur le téléphone. Pas de fenêtre avec des chiffres ou adresse différente — « Retour », puis sur le téléphone ouvrez « Débogage sans fil » → « Associer l'appareil avec un code d'association ».",
+ "u010": "  U) Mettre à jour le kit vers la version {0}",
+ "u011": "Mise à jour vers la version {0}",
+ "u012": "Échec de la mise à jour : {0}",
+ "u013": "  Téléchargez-la manuellement : {0}. Le kit reste sur la version actuelle.",
+ "u014": "Téléchargement de la nouvelle version depuis GitHub...",
+ "u015": "la somme de contrôle ne correspond pas ({0}) — fichier endommagé ou modifié ; rien n'est changé",
+ "u016": "la somme SHA-256 correspond",
+ "u017": "Kit mis à jour vers la version {0} ({1} fichiers)",
+ "u018": "  Les anciens fichiers du kit sont conservés dans {0}",
+ "u019": "Redémarrage du kit avec la nouvelle version...",
+ "ui_update_do": "Mettre à jour",
+ "ui_update_dl": "Téléchargement de phone-kit {0}…",
+ "ui_update_fail": "Échec de la mise à jour : {0}",
+ "ui_update_restart": "Mis à jour vers {0}. Le kit redémarre — la page se rechargera d’elle-même dans quelques secondes."
 }

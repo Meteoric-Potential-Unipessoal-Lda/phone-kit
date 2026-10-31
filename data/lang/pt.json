@@ -699,5 +699,19 @@
  "p004": "A janela de sincronização {0} é de outra rede que não a deste computador (ou ficou de uma tentativa anterior). Confira o endereço no telemóvel.",
  "ui_code_back": "Voltar",
  "ui_code_other": "Outro endereço",
- "ui_code_check": "Compare com o endereço por baixo dos dígitos no telemóvel. Sem janela com dígitos ou endereço diferente — «Voltar» e, no telemóvel, abra «Depuração sem fios» → «Sincronizar dispositivo com código de sincronização»."
+ "ui_code_check": "Compare com o endereço por baixo dos dígitos no telemóvel. Sem janela com dígitos ou endereço diferente — «Voltar» e, no telemóvel, abra «Depuração sem fios» → «Sincronizar dispositivo com código de sincronização».",
+ "u010": "  U) Atualizar o kit para a versão {0}",
+ "u011": "Atualização para a versão {0}",
+ "u012": "Não foi possível atualizar: {0}",
+ "u013": "  Descarregue manualmente: {0}. O kit continua na versão atual.",
+ "u014": "A descarregar a nova versão do GitHub...",
+ "u015": "a soma de verificação não coincide ({0}) — ficheiro danificado ou alterado; nada foi alterado",
+ "u016": "a soma SHA-256 coincide",
+ "u017": "Kit atualizado para a versão {0} ({1} ficheiros)",
+ "u018": "  Os ficheiros anteriores do kit estão guardados em {0}",
+ "u019": "A reiniciar o kit com a nova versão...",
+ "ui_update_do": "Atualizar",
+ "ui_update_dl": "A descarregar o phone-kit {0}…",
+ "ui_update_fail": "Não foi possível atualizar: {0}",
+ "ui_update_restart": "Atualizado para {0}. O kit está a reiniciar — a página recarrega sozinha dentro de segundos."
 }

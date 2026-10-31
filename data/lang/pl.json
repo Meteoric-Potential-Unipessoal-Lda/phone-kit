@@ -699,5 +699,19 @@
  "p004": "Okno parowania {0} jest w innej sieci niż ten komputer (lub zostało z wcześniejszej próby). Sprawdź adres na telefonie.",
  "ui_code_back": "Wstecz",
  "ui_code_other": "Inny adres",
- "ui_code_check": "Porównaj z adresem pod cyframi na telefonie. Brak okna z cyframi lub inny adres — „Wstecz”, a na telefonie otwórz „Debugowanie bezprzewodowe” → „Sparuj urządzenie za pomocą kodu parowania”."
+ "ui_code_check": "Porównaj z adresem pod cyframi na telefonie. Brak okna z cyframi lub inny adres — „Wstecz”, a na telefonie otwórz „Debugowanie bezprzewodowe” → „Sparuj urządzenie za pomocą kodu parowania”.",
+ "u010": "  U) Zaktualizuj zestaw do wersji {0}",
+ "u011": "Aktualizacja do wersji {0}",
+ "u012": "Nie udało się zaktualizować: {0}",
+ "u013": "  Pobierz ręcznie: {0}. Zestaw działa dalej w obecnej wersji.",
+ "u014": "Pobieram nową wersję z GitHuba...",
+ "u015": "suma kontrolna się nie zgadza ({0}) — plik uszkodzony lub podmieniony, niczego nie zmieniam",
+ "u016": "suma kontrolna SHA-256 się zgadza",
+ "u017": "Zestaw zaktualizowany do wersji {0} (plików: {1})",
+ "u018": "  Poprzednie pliki zestawu zapisano w {0}",
+ "u019": "Uruchamiam zestaw ponownie w nowej wersji...",
+ "ui_update_do": "Aktualizuj",
+ "ui_update_dl": "Pobieram phone-kit {0}…",
+ "ui_update_fail": "Nie udało się zaktualizować: {0}",
+ "ui_update_restart": "Zaktualizowano do {0}. Zestaw uruchamia się ponownie — strona odświeży się sama za kilka sekund."
 }

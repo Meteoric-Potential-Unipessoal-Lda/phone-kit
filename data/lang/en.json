@@ -699,5 +699,19 @@
  "p004": "Pairing window {0} is on a different network than this computer (or left over from an earlier attempt). Check the address on the phone.",
  "ui_code_back": "Back",
  "ui_code_other": "Other address",
- "ui_code_check": "Compare with the address under the digits on the phone. No window with digits or a different address — “Back”, then on the phone open “Wireless debugging” → “Pair device with pairing code”."
+ "ui_code_check": "Compare with the address under the digits on the phone. No window with digits or a different address — “Back”, then on the phone open “Wireless debugging” → “Pair device with pairing code”.",
+ "u010": "  U) Update the kit to version {0}",
+ "u011": "Updating to version {0}",
+ "u012": "Update failed: {0}",
+ "u013": "  Download it manually: {0}. The kit keeps running the current version.",
+ "u014": "Downloading the new version from GitHub...",
+ "u015": "checksum mismatch ({0}) — the file is damaged or tampered with; nothing changed",
+ "u016": "SHA-256 checksum matches",
+ "u017": "Kit updated to version {0} ({1} files)",
+ "u018": "  The previous kit files are saved in {0}",
+ "u019": "Restarting the kit with the new version...",
+ "ui_update_do": "Update",
+ "ui_update_dl": "Downloading phone-kit {0}…",
+ "ui_update_fail": "Update failed: {0}",
+ "ui_update_restart": "Updated to {0}. The kit is restarting — this page will reload by itself in a few seconds."
 }
