@@ -42,12 +42,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$KitVersion = '1.0'
+$KitVersion = '1.0.1'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
 $IsWin = ($env:OS -eq 'Windows_NT')
 $IsMac = (-not $IsWin) -and (Test-Path '/System/Library/CoreServices/Finder.app')
+# Windows PowerShell 3.0–5.1: у массивов бывает лишний ETS-Count, и ConvertTo-Json пишет {"value":[…],"Count":n}
+if ($PSVersionTable.PSVersion.Major -lt 6) { try { Remove-TypeData System.Array -ErrorAction Stop } catch {} }
 
 # ----------------------------------------------------------------- языки
 # Все тексты — в data/lang/<код>.json (ключ -> шаблон с {0}, {1}...). Нет перевода — английский, потом русский.
@@ -217,6 +219,20 @@ $WebServer = {
   try { $Listener.Stop() } catch {}
 }
 
+# Windows 7/8: браузер по умолчанию часто Internet Explorer — страница в нём не работает.
+# Берём Chrome / Edge / Firefox / Яндекс / Opera, если есть; если по умолчанию IE и других нет — 'old'.
+function Find-Browser {
+  $def = ''
+  try { $def = [string](Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice' -ErrorAction Stop).ProgId } catch {}
+  $isIe = (-not $def) -or ($def -match '^IE\.')
+  if (-not $isIe) { return $null }
+  $pf = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA) | Where-Object { $_ }
+  $rel = @('Google\Chrome\Application\chrome.exe', 'Microsoft\Edge\Application\msedge.exe', 'Mozilla Firefox\firefox.exe', 'Yandex\YandexBrowser\Application\browser.exe', 'Programs\Opera\launcher.exe', 'Opera\launcher.exe')
+  foreach ($r in $rel) { foreach ($b in $pf) { $f = Join-Path $b $r; if (Test-Path -LiteralPath $f) { return $f } } }
+  $ie = [Environment]::OSVersion.Version
+  if ($def -match '^IE\.' -or ($ie.Major -eq 6 -and $ie.Minor -le 3)) { return 'old' }
+  return $null
+}
 function Start-Web {
   $uiFile = Join-Path (Join-Path $Root 'ui') 'index.html'
   if (-not (Test-Path -LiteralPath $uiFile)) { return $false }
@@ -239,7 +255,11 @@ function Start-Web {
   Say (L 'w002') 'DarkGray'
   if (-not $NoBrowser) {
     try {
-      if ($IsWin) { Start-Process $script:WebUrl }
+      if ($IsWin) {
+        $br = Find-Browser
+        if ($br -eq 'old') { Warn (L 'w006'); $w.stop = $true; $script:WebUi = $null; return $false }
+        if ($br) { Start-Process -FilePath $br -ArgumentList $script:WebUrl } else { Start-Process $script:WebUrl }
+      }
       elseif ($IsMac) { & open $script:WebUrl }
       else { & xdg-open $script:WebUrl 2>$null }
     } catch { Warn (L 'w003') }
@@ -358,9 +378,73 @@ function ShOn([string]$serial, [string]$cmd, [int]$TimeoutSec = 40) {
 }
 function Sh([string]$cmd, [int]$TimeoutSec = 40) { return (ShOn $script:Serial $cmd $TimeoutSec) }
 
+# Скачивание и распаковка, которые работают и в Windows PowerShell 3.0/4.0 (Windows 7/8): там нет Expand-Archive,
+# а по умолчанию включён только старый TLS 1.0 — dl.google.com и github.com его не принимают.
+function Set-Tls {
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch {}
+}
+function Save-Url([string]$url, [string]$dest) {
+  Set-Tls
+  if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue }
+  try {
+    $wc = New-Object Net.WebClient
+    $wc.Headers['User-Agent'] = 'phone-kit'
+    $wc.DownloadFile($url, $dest)
+  } catch {
+    $first = $_.Exception.Message
+    try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest -UserAgent 'phone-kit' }
+    catch { throw ($first + ' / ' + $_.Exception.Message) }
+  }
+  if (-not (Test-Path -LiteralPath $dest) -or (Get-Item -LiteralPath $dest).Length -lt 1000) { throw ('empty download: ' + $url) }
+}
+function Expand-Zip([string]$zip, [string]$dest) {
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  $done = $false
+  try {
+    Add-Type -AssemblyName System.IO.Compression -ErrorAction Stop
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    $za = [IO.Compression.ZipFile]::OpenRead($zip)
+    try {
+      $full = [IO.Path]::GetFullPath($dest)
+      foreach ($e in $za.Entries) {
+        $t = [IO.Path]::GetFullPath((Join-Path $full $e.FullName))
+        if (-not $t.StartsWith($full)) { continue }
+        if ($e.FullName.EndsWith('/') -or $e.FullName.EndsWith('\')) { New-Item -ItemType Directory -Force -Path $t | Out-Null; continue }
+        New-Item -ItemType Directory -Force -Path (Split-Path $t -Parent) | Out-Null
+        [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $t, $true)
+      }
+    } finally { $za.Dispose() }
+    $done = $true
+  } catch { $err = $_.Exception.Message }
+  if (-not $done -and $IsWin) {
+    try {
+      $sh = New-Object -ComObject Shell.Application
+      $sh.NameSpace((Resolve-Path $dest).Path).CopyHere($sh.NameSpace((Resolve-Path $zip).Path).Items(), 0x614)
+      $done = $true
+    } catch {}
+  }
+  if (-not $done) {
+    if (Get-Command Expand-Archive -ErrorAction SilentlyContinue) { Expand-Archive -Path $zip -DestinationPath $dest -Force }
+    else { throw ('unzip: ' + $err) }
+  }
+}
 function Get-PlatformTools([string]$os, [string]$dest) {
-  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-  Invoke-WebRequest -UseBasicParsing -Uri ("https://dl.google.com/android/repository/platform-tools-latest-$os.zip") -OutFile $dest
+  Save-Url ("https://dl.google.com/android/repository/platform-tools-latest-$os.zip") $dest
+}
+# Драйвер Google USB (только Windows): качаем, когда он понадобился, а не только в prepare.bat
+function Get-UsbDriver {
+  $tools = Join-Path $Root 'tools'
+  $ud = Join-Path $tools 'usb_driver'
+  if (Test-Path (Join-Path $ud 'android_winusb.inf')) { return $ud }
+  Say (L 'm017')
+  $uz = Join-Path $env:TEMP 'usb_driver_r13-windows.zip'
+  try {
+    Save-Url 'https://dl.google.com/android/repository/usb_driver_r13-windows.zip' $uz
+    Expand-Zip $uz $tools
+    Remove-Item $uz -Force -ErrorAction SilentlyContinue
+  } catch { Warn ((L 'm020') + $_.Exception.Message); Say (L 'm061'); return $null }
+  if (Test-Path (Join-Path $ud 'android_winusb.inf')) { Ok (L 'm018'); return $ud }
+  Warn (L 'm019'); return $null
 }
 
 function Get-AdbBinary {
@@ -386,7 +470,7 @@ function Get-AdbBinary {
     if ($IsWin) {
       $zip = Join-Path $env:TEMP 'platform-tools-latest-windows.zip'
       Get-PlatformTools 'windows' $zip
-      Expand-Archive -Path $zip -DestinationPath $tools -Force
+      Expand-Zip $zip $tools
       Remove-Item $zip -Force -ErrorAction SilentlyContinue
     } else {
       $zip = Join-Path $tools 'platform-tools-darwin.zip'
@@ -399,6 +483,7 @@ function Get-AdbBinary {
   } catch {
     Bad ((L 'm007') + $_.Exception.Message)
     Say (L 'm008')
+    Say (L 'm008b' $(if ($IsWin) { Join-Path $tools 'platform-tools\adb.exe' } else { Join-Path $tools 'platform-tools-mac/platform-tools/adb' }))
     Finish 1
   }
   if (Test-Path $local) { Ok (L 'm009'); return $local }
@@ -425,24 +510,13 @@ function Invoke-Prepare {
     try { Say (L 'm014'); Get-PlatformTools 'darwin' $macZip; Ok (L 'm015') } catch { Warn ((L 'm016') + $_.Exception.Message) }
   }
   $ud = Join-Path $tools 'usb_driver'
-  if ($IsWin -and -not (Test-Path (Join-Path $ud 'android_winusb.inf'))) {
-    try {
-      Say (L 'm017')
-      $uz = Join-Path $env:TEMP 'usb_driver_r13-windows.zip'
-      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      Invoke-WebRequest -UseBasicParsing -Uri 'https://dl.google.com/android/repository/usb_driver_r13-windows.zip' -OutFile $uz
-      Expand-Archive -Path $uz -DestinationPath $tools -Force
-      Remove-Item $uz -Force -ErrorAction SilentlyContinue
-      if (Test-Path (Join-Path $ud 'android_winusb.inf')) { Ok (L 'm018') } else { Warn (L 'm019') }
-    } catch { Warn ((L 'm020') + $_.Exception.Message) }
-  }
+  if ($IsWin -and -not (Test-Path (Join-Path $ud 'android_winusb.inf'))) { [void](Get-UsbDriver) }
   foreach ($arch in @('arm64', 'x64')) {
     $f = Join-Path $tools "pwsh-osx-$arch.tar.gz"
     if (-not (Test-Path $f)) {
       try {
         Say (L 'm021' $arch)
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -UseBasicParsing -Uri ("https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-osx-$arch.tar.gz") -OutFile $f
+        Save-Url ("https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-osx-$arch.tar.gz") $f
         Ok (L 'm022' $arch)
       } catch { Warn ((L 'm023' $arch) + $_.Exception.Message) }
     }
@@ -566,11 +640,21 @@ function Show-UsbCheck {
   }
   [void](Show-OtherAdb)
   $devs = @()
-  try {
-    $devs = @(Get-PnpDevice -PresentOnly -ErrorAction Stop | Where-Object {
-      $_.InstanceId -match $PhoneVids -or $_.Class -eq 'AndroidUsbDeviceClass' -or $_.FriendlyName -match 'ADB|Android'
-    })
-  } catch { Warn ((L 'm048') + $_.Exception.Message); return }
+  $flt = { $_.InstanceId -match $PhoneVids -or $_.Class -eq 'AndroidUsbDeviceClass' -or $_.FriendlyName -match 'ADB|Android' }
+  if (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue) {
+    try { $devs = @(Get-PnpDevice -PresentOnly -ErrorAction Stop | Where-Object $flt) } catch { $devs = $null }
+  } else { $devs = $null }
+  if ($null -eq $devs) {
+    # Windows 7/8: Get-PnpDevice нет — то же самое через WMI
+    try {
+      $devs = @(Get-WmiObject Win32_PnPEntity -ErrorAction Stop | ForEach-Object {
+        $cls = [string]$_.PNPClass
+        if (-not $cls -and [string]$_.ClassGuid -eq '{3F966BD9-FA04-4EC5-991C-D326973B5128}') { $cls = 'AndroidUsbDeviceClass' }
+        if (-not $cls) { $cls = [string]$_.Service }
+        New-Object PSObject -Property @{ FriendlyName = [string]$_.Name; InstanceId = [string]$_.DeviceID; Class = $cls; Status = $(if ([int]$_.ConfigManagerErrorCode -eq 0) { 'OK' } else { 'Error' }) }
+      } | Where-Object $flt)
+    } catch { Warn ((L 'm048') + $_.Exception.Message); return }
+  }
   if ($devs.Count -eq 0) {
     Warn (L 'm049')
     Say (L 'm050')
@@ -596,9 +680,8 @@ function Show-UsbCheck {
     Say (L 'm059')
     Say (L 'm060')
     if (-not (Test-Path (Join-Path $drv 'android_winusb.inf'))) {
-      Warn (L 'm061')
-      Say (L 'm062')
-    }
+      if (Get-UsbDriver) { Say (L 'm061b' $drv) } else { Say (L 'm062') }
+    } else { Say (L 'm061b' $drv) }
     try { Start-Process devmgmt.msc } catch {}
   } else {
     Warn (L 'm063')
@@ -1480,9 +1563,9 @@ if ($useWeb) { if (-not (Start-Web)) { Warn (L 'w005') } }
 # Новая версия на GitHub? (4 секунды максимум; без интернета — молча дальше)
 if (-not $NoUpdateCheck) {
   try {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Set-Tls
     $uu = $(if ($UpdateUrl) { $UpdateUrl } else { 'https://api.github.com/repos/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest' })
-    $rel = Invoke-RestMethod -Uri $uu -TimeoutSec 4 -UseBasicParsing -Headers @{ 'User-Agent' = 'phone-kit' }
+    $rel = Invoke-RestMethod -Uri $uu -TimeoutSec 4 -UseBasicParsing -UserAgent 'phone-kit'
     $tag = ([string]$rel.tag_name) -replace '^[vV]', ''
     $nv = $null; $cv = $null
     if ([version]::TryParse(($tag + '.0').Split('-')[0], [ref]$nv) -and [version]::TryParse($KitVersion + '.0', [ref]$cv) -and $nv -gt $cv) {

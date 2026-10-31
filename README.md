@@ -4,6 +4,8 @@
 
 **EN** · A repair technician's tool that safely cleans up and speeds up Android phones and tablets over ADB: Samsung, Xiaomi / Redmi / Poco, Realme / OPPO, Honor / Huawei, Motorola, Pixel and others. Runs on Windows or Mac, opens a local page in the browser (works offline); the phone connects by USB cable or by Wi-Fi pairing code (Android 11+). Rule number one is **do no harm**: read-only diagnostics first, then a plan with checkboxes, changes only after you confirm, in batches with checks, everything reversible and logged for one-click rollback.
 
+Requirements: Windows 8 / 8.1 / 10 / 11 (Windows 7 SP1 with WMF 5.1) or macOS; Chrome, Edge, Firefox, Safari or another modern browser (Internet Explorer is not supported — the kit then works in the console window).
+
 Interface languages: Русский, Українська, English, Português, Español, Français, Italiano, Deutsch, Latviešu, Polski.
 
 **RU** · Инструмент мастера, который безопасно чистит и ускоряет телефоны и планшеты Android по ADB. Запускается на компьютере (Windows или Mac) и открывает страницу в браузере (без интернета); телефон подключается кабелем или по Wi-Fi кодом (Android 11+). Главное правило — **не навредить**: сначала диагностика (только чтение), потом план с галочками, изменения только после подтверждения, партиями с проверкой, всё обратимо и записывается в журнал для отката.
