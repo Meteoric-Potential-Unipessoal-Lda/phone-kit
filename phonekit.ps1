@@ -1744,7 +1744,9 @@ function Invoke-Storage {
     $t = @{ 'camera' = 'k015'; 'pictures' = 'k016'; 'movies' = 'k017'; 'download' = 'k018'; 'whatsapp' = 'k019'; 'viber' = 'k020' }[$k]
     AddS 'move' $k (L $t (Fmt-Bytes ($kb * 1KB))) $false $gM ($kb * 1KB) @($MoveDirs[$k] | Where-Object { $duKb.ContainsKey($_) })
   }
-  $big = @(Get-RemoteFiles '/sdcard/' $BigMb | Where-Object { $_.Path -notmatch '^/sdcard/Android/(data|obb)/' -and $_.Path -notmatch '/\.thumbnails/' } | Sort-Object Size -Descending | Select-Object -First 15)
+  # сначала в переменную: функция отдаёт список целиком (return ,$r) — в конвейере он был бы одним объектом
+  $bigAll = Get-RemoteFiles '/sdcard/' $BigMb
+  $big = @($bigAll | Where-Object { $_.Path -notmatch '^/sdcard/Android/(data|obb)/' -and $_.Path -notmatch '/\.thumbnails/' } | Sort-Object Size -Descending | Select-Object -First 15)
   foreach ($f in $big) {
     $when = ''; try { $when = ([datetime]'1970-01-01').AddSeconds($f.Mtime).ToLocalTime().ToString('yyyy-MM-dd') } catch {}
     AddS 'big' $f.Path (L 'k021' ($f.Path.Substring(8)) (Fmt-Bytes $f.Size) $when) $false $gB $f.Size @($f.Path) $f
