@@ -105,13 +105,14 @@ expect w_reboot 'после перезагрузки всё отключённо
 SD="$WORK/sdcard"; CP="$WORK/copies"; rm -rf "$SD" "$CP"
 mk() { mkdir -p "$(dirname "$SD/$1")"; head -c "$2" /dev/urandom > "$SD/$1"; }
 mk 'DCIM/Camera/IMG_0001.jpg' 900000; mk 'DCIM/Camera/IMG 0002 копия.jpg' 400000; mk "DCIM/Camera/it's.jpg" 50000; mk 'DCIM/Camera/BROKEN_0003.jpg' 100000
-mk 'DCIM/.thumbnails/t1.jpg' 200000; mk 'Download/app-release.apk' 300000; mk 'Download/doc.pdf' 100000; mk 'Download/film.mkv' 3200000
+mk 'DCIM/.thumbnails/t1.jpg' 200000; mk 'Download/app-release.apk' 300000; mk 'Download/doc.pdf' 100000; mk 'Download/film.mkv' 3200000; mk 'Documents/backup.zip' 2600000
 mk 'Android/data/org.telegram.messenger/cache/c1' 500000; mk 'Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-1.jpg' 1100000
 MOCK_SDCARD="$SD" KIT_ARGS="-CopyTo $CP -BigMb 2" run st_mem samsung '4\nТест\n4 5 7\n\nда\n'
 expect st_mem 'Удалено: Миниатюры галереи'
 expect st_mem 'Удалено: Кэш Telegram'
 expect st_mem 'Установочные файлы .apk'
 expect st_mem 'film.mkv'
+expect st_mem 'backup.zip'
 expect st_mem 'с телефона удалены'
 expect st_mem 'не скопировались'
 expect st_mem 'необычными символами'
