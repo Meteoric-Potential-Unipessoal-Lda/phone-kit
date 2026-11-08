@@ -126,3 +126,15 @@ com.google.android.googlequicksearchbox	Google app (search, “Hey Google”)
 com.google.android.as	Android System Intelligence (smart suggestions)
 com.google.android.apps.subscriptions.red	Google One
 com.google.android.projection.gearhead	Android Auto
+com.miui.systemAdSolution	Xiaomi: ad system (Chinese firmware)
+com.mi.android.globalminusscreen	Xiaomi: App Vault feed left of the home screen (news and ads)
+com.heytap.pictorial	OPPO/Realme: lock screen “Magazine” (ads)
+com.nearme.statistics.rom	OPPO/Realme: data collection (user experience program)
+com.heytap.market	OPPO/Realme: App Market store (ads and “recommended” apps)
+com.oppo.market	OPPO: App Market store (ads and “recommended” apps)
+com.heytap.browser	OPPO/Realme browser (ads in the feed)
+com.coloros.assistantscreen	OPPO/Realme: panel left of the home screen (widgets and suggestions)
+com.realme.securitycheck	Realme: app “security check” (shows ads)
+com.dti.samsung	carrier/partners: installs extra apps (DT Ignite)
+com.aura.oobe.samsung	AppCloud: installs promoted apps
+com.ironsource.appcloud.oobe	AppCloud (ironSource): installs promoted apps

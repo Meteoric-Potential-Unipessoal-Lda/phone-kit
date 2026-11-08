@@ -126,3 +126,15 @@ com.google.android.googlequicksearchbox	appli Google (recherche, « Ok Google »
 com.google.android.as	Android System Intelligence (suggestions intelligentes)
 com.google.android.apps.subscriptions.red	Google One
 com.google.android.projection.gearhead	Android Auto
+com.miui.systemAdSolution	Xiaomi : système publicitaire (firmware chinois)
+com.mi.android.globalminusscreen	Xiaomi : flux App Vault à gauche de l'écran d'accueil (actus et pub)
+com.heytap.pictorial	OPPO/Realme : « Magazine » sur l'écran de verrouillage (pub)
+com.nearme.statistics.rom	OPPO/Realme : collecte de données (programme d'amélioration)
+com.heytap.market	OPPO/Realme : boutique App Market (pub et applis « recommandées »)
+com.oppo.market	OPPO : boutique App Market (pub et applis « recommandées »)
+com.heytap.browser	navigateur OPPO/Realme (pub dans le flux)
+com.coloros.assistantscreen	OPPO/Realme : panneau à gauche de l'écran d'accueil (widgets et suggestions)
+com.realme.securitycheck	Realme : « contrôle de sécurité » des applis (affiche de la pub)
+com.dti.samsung	opérateur/partenaires : installe des applis supplémentaires (DT Ignite)
+com.aura.oobe.samsung	AppCloud : installe des applis sponsorisées
+com.ironsource.appcloud.oobe	AppCloud (ironSource) : installe des applis sponsorisées
