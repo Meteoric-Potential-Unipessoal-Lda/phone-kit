@@ -126,3 +126,15 @@ com.google.android.googlequicksearchbox	ask	приложение Google (пои�
 com.google.android.as	ask	Android System Intelligence (умные подсказки)
 com.google.android.apps.subscriptions.red	ask	Google One
 com.google.android.projection.gearhead	ask	Android Auto
+com.miui.systemAdSolution	ok	Xiaomi: рекламная система (китайские прошивки)
+com.mi.android.globalminusscreen	ask	Xiaomi: лента App Vault слева на рабочем столе (новости и реклама)
+com.heytap.pictorial	ok	OPPO/Realme: «Журнал» на экране блокировки (реклама)
+com.nearme.statistics.rom	ok	OPPO/Realme: сбор данных (программа улучшения)
+com.heytap.market	ask	OPPO/Realme: магазин App Market (реклама и «рекомендованные» приложения)
+com.oppo.market	ask	OPPO: магазин App Market (реклама и «рекомендованные» приложения)
+com.heytap.browser	ask	браузер OPPO/Realme (реклама в ленте)
+com.coloros.assistantscreen	ask	OPPO/Realme: панель слева на рабочем столе (виджеты и рекомендации)
+com.realme.securitycheck	ask	Realme: «проверка безопасности» приложений (показывает рекламу)
+com.dti.samsung	ok	оператор/партнёры: доустанавливает приложения (DT Ignite)
+com.aura.oobe.samsung	ok	AppCloud: доустанавливает рекламные приложения
+com.ironsource.appcloud.oobe	ok	AppCloud (ironSource): доустанавливает рекламные приложения
