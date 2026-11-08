@@ -713,5 +713,19 @@
  "ui_update_do": "Aktualizuj",
  "ui_update_dl": "Pobieram phone-kit {0}…",
  "ui_update_fail": "Nie udało się zaktualizować: {0}",
- "ui_update_restart": "Zaktualizowano do {0}. Zestaw uruchamia się ponownie — strona odświeży się sama za kilka sekund."
+ "ui_update_restart": "Zaktualizowano do {0}. Zestaw uruchamia się ponownie — strona odświeży się sama za kilka sekund.",
+ "e001": "Zestaw zatrzymał się z powodu błędu:",
+ "e002": "Wyślij ten plik do grupy zestawu (albo osobie, która dała ci zestaw) — dzięki niemu błąd zostanie szybko naprawiony:",
+ "e003": "Zmiany wprowadzone przed błędem ({0}) są w dzienniku — można je cofnąć opcją 3.",
+ "e004": "Nie udało się utworzyć archiwum błędu — wyślij zrzut tego okna.",
+ "ui_crash_t": "Zestaw zatrzymał się z powodu błędu",
+ "ui_crash_d": "Wszystko, co potrzebne do naprawy, jest w jednym pliku. Wyślij go do grupy zestawu (albo osobie, która dała ci zestaw).",
+ "ui_crash_j": "Zmiany wprowadzone przed błędem ({0}) są w dzienniku — można je cofnąć opcją 3.",
+ "ui_crash_none": "Nie udało się utworzyć archiwum — wyślij zrzut ekranu z błędem.",
+ "ui_open": "Otwórz folder",
+ "ui_open_fail": "Nie udało się otworzyć folderu — ścieżka pliku jest podana wyżej.",
+ "a001": "Reklamy i zbieranie danych w oprogramowaniu",
+ "a003": "Reklamy i zbieranie danych w oprogramowaniu: działa usług — {0}. Można je wyłączyć w opcji 2 (sekcja „Reklamy”).",
+ "a004": "Reklamy w oprogramowaniu: wyłączono usług — {0}",
+ "a005": "Usługi reklamowe i zbierające dane producenta (włączone):"
 }

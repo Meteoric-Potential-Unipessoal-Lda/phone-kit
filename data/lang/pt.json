@@ -713,5 +713,19 @@
  "ui_update_do": "Atualizar",
  "ui_update_dl": "A descarregar o phone-kit {0}…",
  "ui_update_fail": "Não foi possível atualizar: {0}",
- "ui_update_restart": "Atualizado para {0}. O kit está a reiniciar — a página recarrega sozinha dentro de segundos."
+ "ui_update_restart": "Atualizado para {0}. O kit está a reiniciar — a página recarrega sozinha dentro de segundos.",
+ "e001": "O kit parou devido a um erro:",
+ "e002": "Envie este ficheiro para o grupo do kit (ou para quem lhe deu o kit) — com ele o erro é corrigido rapidamente:",
+ "e003": "As alterações feitas antes do erro ({0}) estão no registo — pode anulá-las com a opção 3.",
+ "e004": "Não foi possível criar o arquivo do erro — envie uma captura desta janela.",
+ "ui_crash_t": "O kit parou devido a um erro",
+ "ui_crash_d": "Tudo o que é preciso para a correção está num só ficheiro. Envie-o para o grupo do kit (ou para quem lhe deu o kit).",
+ "ui_crash_j": "As alterações feitas antes do erro ({0}) estão no registo — pode anulá-las com a opção 3.",
+ "ui_crash_none": "Não foi possível criar o arquivo — envie uma captura de ecrã do erro.",
+ "ui_open": "Abrir pasta",
+ "ui_open_fail": "Não foi possível abrir a pasta — o caminho do ficheiro está indicado acima.",
+ "a001": "Publicidade e recolha de dados no firmware",
+ "a003": "Publicidade e recolha de dados no firmware: {0} serviços ativos. Pode desativá-los na opção 2 (secção «Publicidade»).",
+ "a004": "Publicidade no firmware: {0} serviços desativados",
+ "a005": "Serviços de publicidade e recolha de dados do fabricante (ativos):"
 }

@@ -713,5 +713,19 @@
  "ui_update_do": "Mettre à jour",
  "ui_update_dl": "Téléchargement de phone-kit {0}…",
  "ui_update_fail": "Échec de la mise à jour : {0}",
- "ui_update_restart": "Mis à jour vers {0}. Le kit redémarre — la page se rechargera d’elle-même dans quelques secondes."
+ "ui_update_restart": "Mis à jour vers {0}. Le kit redémarre — la page se rechargera d’elle-même dans quelques secondes.",
+ "e001": "Le kit s'est arrêté à cause d'une erreur :",
+ "e002": "Envoyez ce fichier au groupe du kit (ou à la personne qui vous a donné le kit) : il permet de corriger l'erreur rapidement :",
+ "e003": "Les modifications faites avant l'erreur ({0}) sont dans le journal : vous pouvez les annuler avec l'option 3.",
+ "e004": "Impossible de créer l'archive de l'erreur : envoyez une capture de cette fenêtre.",
+ "ui_crash_t": "Le kit s'est arrêté à cause d'une erreur",
+ "ui_crash_d": "Tout ce qu'il faut pour la corriger est réuni dans un seul fichier. Envoyez-le au groupe du kit (ou à la personne qui vous a donné le kit).",
+ "ui_crash_j": "Les modifications faites avant l'erreur ({0}) sont dans le journal : vous pouvez les annuler avec l'option 3.",
+ "ui_crash_none": "Impossible de créer l'archive : envoyez une capture d'écran de l'erreur.",
+ "ui_open": "Ouvrir le dossier",
+ "ui_open_fail": "Impossible d'ouvrir le dossier : le chemin du fichier est indiqué ci-dessus.",
+ "a001": "Publicité et collecte de données du firmware",
+ "a003": "Publicité et collecte de données du firmware : {0} services actifs. Vous pouvez les désactiver dans l'option 2 (section « Publicité »).",
+ "a004": "Publicité du firmware : {0} services désactivés",
+ "a005": "Services de publicité et de collecte de données du fabricant (actifs) :"
 }

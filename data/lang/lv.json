@@ -713,5 +713,19 @@
  "ui_update_do": "Atjaunināt",
  "ui_update_dl": "Lejupielādēju phone-kit {0}…",
  "ui_update_fail": "Neizdevās atjaunināt: {0}",
- "ui_update_restart": "Atjaunināts uz {0}. Rīks restartējas — lapa pati atsvaidzināsies pēc dažām sekundēm."
+ "ui_update_restart": "Atjaunināts uz {0}. Rīks restartējas — lapa pati atsvaidzināsies pēc dažām sekundēm.",
+ "e001": "Komplekts apstājās kļūdas dēļ:",
+ "e002": "Nosūtiet šo failu komplekta grupai (vai tam, kas jums iedeva komplektu) — pēc tā kļūdu ātri izlabos:",
+ "e003": "Izmaiņas, kas veiktas pirms kļūdas ({0}), ir žurnālā — tās var atsaukt ar 3. punktu.",
+ "e004": "Kļūdas arhīvu neizdevās izveidot — nosūtiet šī loga ekrānuzņēmumu.",
+ "ui_crash_t": "Komplekts apstājās kļūdas dēļ",
+ "ui_crash_d": "Viss labošanai nepieciešamais ir savākts vienā failā. Nosūtiet to komplekta grupai (vai tam, kas jums iedeva komplektu).",
+ "ui_crash_j": "Izmaiņas, kas veiktas pirms kļūdas ({0}), ir žurnālā — tās var atsaukt ar 3. punktu.",
+ "ui_crash_none": "Arhīvu neizdevās izveidot — nosūtiet kļūdas ekrānuzņēmumu.",
+ "ui_open": "Atvērt mapi",
+ "ui_open_fail": "Mapi neizdevās atvērt — faila ceļš norādīts augstāk.",
+ "a001": "Reklāmas un datu vākšana programmaparatūrā",
+ "a003": "Reklāmas un datu vākšana programmaparatūrā: darbojas {0} pakalpojumi. Tos var izslēgt 2. punktā (sadaļa „Reklāmas”).",
+ "a004": "Reklāmas programmaparatūrā: izslēgti {0} pakalpojumi",
+ "a005": "Ražotāja reklāmu un datu vākšanas pakalpojumi (ieslēgti):"
 }

@@ -713,5 +713,19 @@
  "ui_update_do": "Aktualisieren",
  "ui_update_dl": "phone-kit {0} wird geladen…",
  "ui_update_fail": "Aktualisierung fehlgeschlagen: {0}",
- "ui_update_restart": "Auf {0} aktualisiert. Das Kit startet neu — die Seite lädt sich in ein paar Sekunden selbst neu."
+ "ui_update_restart": "Auf {0} aktualisiert. Das Kit startet neu — die Seite lädt sich in ein paar Sekunden selbst neu.",
+ "e001": "Das Kit wurde wegen eines Fehlers angehalten:",
+ "e002": "Schick diese Datei an die Kit-Gruppe (oder an die Person, von der du das Kit hast) – damit lässt sich der Fehler schnell beheben:",
+ "e003": "Änderungen vor dem Fehler ({0}) stehen im Protokoll – du kannst sie mit Punkt 3 rückgängig machen.",
+ "e004": "Das Fehlerarchiv konnte nicht erstellt werden – schick einen Screenshot dieses Fensters.",
+ "ui_crash_t": "Das Kit wurde wegen eines Fehlers angehalten",
+ "ui_crash_d": "Alles, was zur Behebung nötig ist, steckt in einer Datei. Schick sie an die Kit-Gruppe (oder an die Person, von der du das Kit hast).",
+ "ui_crash_j": "Änderungen vor dem Fehler ({0}) stehen im Protokoll – du kannst sie mit Punkt 3 rückgängig machen.",
+ "ui_crash_none": "Das Archiv konnte nicht erstellt werden – schick einen Screenshot des Fehlers.",
+ "ui_open": "Ordner öffnen",
+ "ui_open_fail": "Der Ordner ließ sich nicht öffnen – der Dateipfad steht oben.",
+ "a001": "Werbung und Datensammlung in der Firmware",
+ "a003": "Werbung und Datensammlung in der Firmware: {0} Dienste aktiv. Du kannst sie in Punkt 2 abschalten (Abschnitt „Werbung“).",
+ "a004": "Werbung in der Firmware: {0} Dienste abgeschaltet",
+ "a005": "Werbe- und Datensammeldienste des Herstellers (aktiv):"
 }

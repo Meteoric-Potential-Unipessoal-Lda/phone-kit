@@ -713,5 +713,19 @@
  "ui_update_do": "Aggiorna",
  "ui_update_dl": "Scarico phone-kit {0}…",
  "ui_update_fail": "Aggiornamento non riuscito: {0}",
- "ui_update_restart": "Aggiornato a {0}. Il kit si sta riavviando: la pagina si ricaricherà da sola tra pochi secondi."
+ "ui_update_restart": "Aggiornato a {0}. Il kit si sta riavviando: la pagina si ricaricherà da sola tra pochi secondi.",
+ "e001": "Il kit si è fermato per un errore:",
+ "e002": "Invia questo file al gruppo del kit (o a chi ti ha dato il kit): con esso l'errore si corregge in fretta:",
+ "e003": "Le modifiche fatte prima dell'errore ({0}) sono nel registro: puoi annullarle con l'opzione 3.",
+ "e004": "Impossibile creare l'archivio dell'errore: invia uno screenshot di questa finestra.",
+ "ui_crash_t": "Il kit si è fermato per un errore",
+ "ui_crash_d": "Tutto ciò che serve per correggerlo è raccolto in un unico file. Invialo al gruppo del kit (o a chi ti ha dato il kit).",
+ "ui_crash_j": "Le modifiche fatte prima dell'errore ({0}) sono nel registro: puoi annullarle con l'opzione 3.",
+ "ui_crash_none": "Impossibile creare l'archivio: invia uno screenshot dell'errore.",
+ "ui_open": "Apri cartella",
+ "ui_open_fail": "Impossibile aprire la cartella: il percorso del file è indicato sopra.",
+ "a001": "Pubblicità e raccolta dati nel firmware",
+ "a003": "Pubblicità e raccolta dati nel firmware: {0} servizi attivi. Puoi disattivarli nell'opzione 2 (sezione «Pubblicità»).",
+ "a004": "Pubblicità nel firmware: {0} servizi disattivati",
+ "a005": "Servizi di pubblicità e raccolta dati del produttore (attivi):"
 }

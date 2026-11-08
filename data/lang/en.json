@@ -713,5 +713,19 @@
  "ui_update_do": "Update",
  "ui_update_dl": "Downloading phone-kit {0}…",
  "ui_update_fail": "Update failed: {0}",
- "ui_update_restart": "Updated to {0}. The kit is restarting — this page will reload by itself in a few seconds."
+ "ui_update_restart": "Updated to {0}. The kit is restarting — this page will reload by itself in a few seconds.",
+ "e001": "The kit stopped because of an error:",
+ "e002": "Send this file to the kit group (or to whoever gave you the kit) — it lets us fix the error quickly:",
+ "e003": "Changes made before the error ({0}) are in the journal — you can undo them with option 3.",
+ "e004": "Could not create the error archive — send a screenshot of this window.",
+ "ui_crash_t": "The kit stopped because of an error",
+ "ui_crash_d": "Everything needed to fix it is collected in one file. Send it to the kit group (or to whoever gave you the kit).",
+ "ui_crash_j": "Changes made before the error ({0}) are in the journal — you can undo them with option 3.",
+ "ui_crash_none": "Could not create the archive — send a screenshot of the error.",
+ "ui_open": "Open folder",
+ "ui_open_fail": "Could not open the folder — the file path is shown above.",
+ "a001": "Firmware ads and data collection",
+ "a003": "Firmware ads and data collection: {0} services running. You can turn them off in option 2 (section “Ads”).",
+ "a004": "Firmware ads: {0} services turned off",
+ "a005": "Manufacturer ad and data collection services (enabled):"
 }
