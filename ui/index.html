@@ -468,6 +468,16 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     var hideOnQuestion = S.q && ((S.q.extra && S.q.extra.screen === 'start') || S.q.kind === 'pick');
     p.style.order = (S.stage === 'plan' && S.summary) ? '-1' : '';
     if (S.closed) { p.innerHTML = '<div class="card pad row">' + ICON.check + '<h2>' + esc(T('ui_closed')) + '</h2></div>'; return; }
+    if (S.crash) {
+      var cr = S.crash;
+      p.innerHTML = '<div class="card pad" style="display:flex;flex-direction:column;gap:12px;border:2px solid var(--red)"><h1 style="color:var(--red)">' + esc(T('ui_crash_t')) + '</h1>' +
+        (cr.zip ? '<p class="lead">' + esc(T('ui_crash_d')) + '</p><p class="mono" style="overflow-wrap:anywhere;font-weight:600">' + esc(cr.zip) + '</p>' : '<p class="lead">' + esc(T('ui_crash_none')) + '</p>') +
+        (cr.journal ? '<div class="note warn">' + esc(T('ui_crash_j', cr.journal)) + '</div>' : '') +
+        '<p class="sub mono" style="overflow-wrap:anywhere">' + esc(cr.msg || '') + '</p>' +
+        '<div class="row">' + (cr.zip ? '<button type="button" class="btn btn-primary" data-open="crash">' + esc(T('ui_open')) + '</button>' : '') +
+        (S.finished ? '<button type="button" class="btn btn-ghost" id="closebtn">' + esc(T('ui_close')) + '</button>' : '') + '</div><p class="sub" id="openmsg"></p></div>';
+      bindPanel(p); return;
+    }
     if (S.stage === 'connect') {
       var hint = logSince(S.stageLogFrom.connect, 200).filter(function (e) { return e.k !== 'title' && !/^\s*[A-Z0-9]\)\s/.test(e.t); }).slice(-14);
       if (hint.length) { h += '<section class="card"><div class="ghead" style="padding:14px 18px"><h2 style="font-size:16px">' + esc(T('ui_hints')) + '</h2></div><div class="logbox" style="max-height:340px">'; for (var i = 0; i < hint.length; i++) h += logHtml(hint[i]); h += '</div></section>'; }
@@ -490,17 +500,25 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
       var dh = '<div class="card pad" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div class="big-ok">' + ICON.check + '</div><div style="flex:1 1 280px"><h1>' + esc(T('ui_done_t')) + '</h1><p class="lead">' + esc(T(msg)) + '</p>' +
         (S.mode === 'opt' && S.report.journal ? '<p class="sub" style="margin-top:6px">' + esc(T('ui_journal_n', S.report.journal)) + '</p>' : '') + '</div></div>' +
         compareHtml(S.compare) +
-        (S.report.dest ? '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_copies')) + '</h2><p class="mono" style="overflow-wrap:anywhere">' + esc(S.report.dest) + '</p><p class="sub">' + esc(T('ui_copies_d')) + '</p></div>' : '') +
+        (S.report.dest ? '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_copies')) + '</h2><p class="mono" style="overflow-wrap:anywhere">' + esc(S.report.dest) + '</p><p class="sub">' + esc(T('ui_copies_d')) + '</p><div class="row"><button type="button" class="btn btn-ghost" data-open="copies">' + esc(T('ui_open')) + '</button></div></div>' : '') +
         (S.client ? '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_client')) + '</h2><p class="sub">' + esc(T('ui_client_d')) + '</p><div class="row"><a class="btn btn-primary" target="_blank" rel="noopener" href="/api/client?t=' + TOKEN + '&amp;r=' + S.seq + '">' + esc(T('ui_client')) + ' ↗</a></div></div>' : '') +
         '<div class="card pad" style="display:flex;flex-direction:column;gap:10px"><h2 style="font-size:16px">' + esc(T('ui_report')) + '</h2><p class="mono" style="overflow-wrap:anywhere">' + esc(S.report.zip) + '</p><p class="sub">' + esc(T('ui_report_d')) + '</p>' +
-        (S.finished ? '<div class="row"><button type="button" class="btn btn-primary" id="closebtn">' + esc(T('ui_close')) + '</button></div>' : '') + '</div>';
+        '<div class="row"><button type="button" class="btn btn-ghost" data-open="report">' + esc(T('ui_open')) + '</button>' + (S.finished ? '<button type="button" class="btn btn-primary" id="closebtn">' + esc(T('ui_close')) + '</button>' : '') + '</div><p class="sub" id="openmsg"></p></div>';
       h = dh + h;
     } else if (S.finished && !S.q) {
       h = '<div class="card pad" style="display:flex;flex-direction:column;gap:14px"><h2>' + esc(T('ui_finished')) + '</h2><div class="row"><button type="button" class="btn btn-primary" id="closebtn">' + esc(T('ui_close')) + '</button></div></div>' + h;
     }
     if (hideOnQuestion) h = '';
     p.innerHTML = h;
+    bindPanel(p);
+  }
+  function bindPanel(p) {
     var cb = $('closebtn'); if (cb) cb.onclick = function () { api('/api/close', {}).catch(function () {}); S.closed = true; renderPanel(); };
+    var ob = p.querySelectorAll('[data-open]');
+    for (var i = 0; i < ob.length; i++) ob[i].onclick = function () {
+      var m = $('openmsg');
+      api('/api/open', { what: this.getAttribute('data-open') }).then(function (r) { if (m) m.textContent = r.ok ? '' : T('ui_open_fail'); }).catch(function () { if (m) m.textContent = T('ui_open_fail'); });
+    };
   }
   function diagHtml(s) {
     var red = '#D92D20', amber = '#F79009', green = '#12B76A';
@@ -573,6 +591,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     else if (ev.type === 'finished') S.finished = true;
     else if (ev.type === 'compare') S.compare = d;
     else if (ev.type === 'client') S.client = d;
+    else if (ev.type === 'crash') S.crash = d;
     else if (ev.type === 'update') { S.update = d; renderUpdate(); }
   }
   var failures = 0, first = true;
