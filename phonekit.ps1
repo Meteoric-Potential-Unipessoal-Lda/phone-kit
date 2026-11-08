@@ -49,7 +49,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $script:BoundArgs = @{}; foreach ($k in $PSBoundParameters.Keys) { $script:BoundArgs[$k] = $PSBoundParameters[$k] }
 $script:UpdateInfo = $null
-$KitVersion = '1.2'
+$KitVersion = '1.3'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -109,6 +109,11 @@ function Emit([string]$type, $data) {
 }
 # kind: text | code6 | addr | menu | confirm | enter | plan;  options: @(@{ key; label }), extra: что угодно для страницы
 function Ask([string]$prompt, [string]$kind = 'text', $options = $null, $extra = $null) {
+  $r = Ask-Core $prompt $kind $options $extra
+  Add-LogBuf ('> ' + $prompt + ': ' + $r)
+  return $r
+}
+function Ask-Core([string]$prompt, [string]$kind, $options, $extra) {
   $w = $script:WebUi
   if (-not $w) { return ([string](Read-Host $prompt)).Trim() }
   $id = [guid]::NewGuid().ToString('N').Substring(0, 10)
@@ -218,6 +223,20 @@ $WebServer = {
         }
         if ($path -eq '/api/lang' -and $o -and ([string]$o.code -match '^[a-z]{2}$')) { $W.langReq = [string]$o.code; $W.lang = [string]$o.code; SendText $c 200 'application/json' '{"ok":true}'; continue }
         if ($path -eq '/api/close') { $W.closeReq = $true; SendText $c 200 'application/json' '{"ok":true}'; continue }
+        if ($path -eq '/api/open' -and $o) {
+          # путь берётся только из таблицы набора ($W.open), со страницы приходит лишь имя: report | crash | copies
+          $p = [string]$W.open[[string]$o.what]; $ok = $false
+          if ($p -and (Test-Path -LiteralPath $p)) {
+            try {
+              $isFile = Test-Path -LiteralPath $p -PathType Leaf
+              if ($W.noopen) { }
+              elseif ($W.os -eq 'win') { if ($isFile) { Start-Process explorer.exe -ArgumentList ('/select,"' + $p + '"') } else { Start-Process explorer.exe -ArgumentList ('"' + $p + '"') } }
+              elseif ($W.os -eq 'mac') { if ($isFile) { & open -R $p } else { & open $p } }
+              $W.opened = $p; $ok = $true
+            } catch {}
+          }
+          SendText $c 200 'application/json' $(if ($ok) { '{"ok":true}' } else { '{"ok":false}' }); continue
+        }
       }
       SendText $c 404 'text/plain' 'not found'
     } catch {
@@ -256,7 +275,7 @@ function Start-Web {
     try { $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $p); $l.Start(); $listener = $l; $port = $p; break } catch {}
   }
   if (-not $listener) { return $false }
-  $w = [hashtable]::Synchronized(@{ events = (New-Object System.Collections.ArrayList); seq = 0; question = $null; answer = $null; lang = $script:Lang; langReq = $null; stop = $false; finished = $false; closeReq = $false; kit = $KitVersion; boot = [guid]::NewGuid().ToString('N').Substring(0, 8) })
+  $w = [hashtable]::Synchronized(@{ events = (New-Object System.Collections.ArrayList); seq = 0; question = $null; answer = $null; lang = $script:Lang; langReq = $null; stop = $false; finished = $false; closeReq = $false; kit = $KitVersion; boot = [guid]::NewGuid().ToString('N').Substring(0, 8); open = [hashtable]::Synchronized(@{}); opened = ''; noopen = [bool]$env:PHONEKIT_TEST_NOOPEN; os = $(if ($IsWin) { 'win' } elseif ($IsMac) { 'mac' } else { 'other' }) })
   $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
   $ps = [powershell]::Create(); $ps.Runspace = $rs
   [void]$ps.AddScript($WebServer).AddArgument($w).AddArgument($listener).AddArgument($html).AddArgument((Join-Path (Join-Path $Root 'data') 'lang')).AddArgument($token)
@@ -298,11 +317,16 @@ function Stop-Web {
 
 # ----------------------------------------------------------------- вывод
 
-function Say([string]$t, [string]$c = 'Gray') { Write-Host $t -ForegroundColor $c; Emit 'log' @{ k = 'say'; c = $c; t = $t } }
-function Title([string]$t) { Write-Host ''; Write-Host ('== ' + $t) -ForegroundColor Cyan; Emit 'log' @{ k = 'title'; t = $t } }
-function Ok([string]$t) { Write-Host ('  [ok] ' + $t) -ForegroundColor Green; Emit 'log' @{ k = 'ok'; t = $t } }
-function Warn([string]$t) { Write-Host ('  [!] ' + $t) -ForegroundColor Yellow; Emit 'log' @{ k = 'warn'; t = $t } }
-function Bad([string]$t) { Write-Host ('  [x] ' + $t) -ForegroundColor Red; Emit 'log' @{ k = 'bad'; t = $t } }
+# Всё, что выводится, копится и в $script:LogBuf — при сбое оно попадёт в архив (log.txt)
+$script:LogBuf = New-Object System.Collections.ArrayList
+function Add-LogBuf([string]$t) {
+  try { [void]$script:LogBuf.Add(('{0:HH:mm:ss} {1}' -f (Get-Date), $t)); if ($script:LogBuf.Count -gt 4000) { $script:LogBuf.RemoveRange(0, 1000) } } catch {}
+}
+function Say([string]$t, [string]$c = 'Gray') { Write-Host $t -ForegroundColor $c; Add-LogBuf $t; Emit 'log' @{ k = 'say'; c = $c; t = $t } }
+function Title([string]$t) { Write-Host ''; Write-Host ('== ' + $t) -ForegroundColor Cyan; Add-LogBuf ('== ' + $t); Emit 'log' @{ k = 'title'; t = $t } }
+function Ok([string]$t) { Write-Host ('  [ok] ' + $t) -ForegroundColor Green; Add-LogBuf ('  [ok] ' + $t); Emit 'log' @{ k = 'ok'; t = $t } }
+function Warn([string]$t) { Write-Host ('  [!] ' + $t) -ForegroundColor Yellow; Add-LogBuf ('  [!] ' + $t); Emit 'log' @{ k = 'warn'; t = $t } }
+function Bad([string]$t) { Write-Host ('  [x] ' + $t) -ForegroundColor Red; Add-LogBuf ('  [x] ' + $t); Emit 'log' @{ k = 'bad'; t = $t } }
 
 function Finish([int]$code) {
   # Останавливаем свой adb-сервер: иначе adb остаётся в памяти и папку у клиента не удалить.
@@ -313,6 +337,106 @@ function Finish([int]$code) {
   elseif (-not $NoPause) { Write-Host ''; [void](Read-Host (L 'm001')) }
   exit $code
 }
+function Set-OpenPath([string]$what, [string]$path) { if ($script:WebUi -and $path) { $script:WebUi.open[$what] = $path } }
+function Open-InFolder([string]$p) {
+  if ($env:PHONEKIT_TEST_NOOPEN) { return }
+  try {
+    if ($IsWin) { Start-Process explorer.exe -ArgumentList ('/select,"' + $p + '"') }
+    elseif ($IsMac) { & open -R $p }
+  } catch {}
+}
+function Zip-Dir([string]$dir, [string]$zip) {
+  Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
+  Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
+  $za = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+  try {
+    $base = (Resolve-Path -LiteralPath $dir).Path.TrimEnd('\', '/')
+    foreach ($f in (Get-ChildItem -LiteralPath $dir -Recurse -File)) {
+      $rel = $f.FullName.Substring($base.Length + 1) -replace '\\', '/'
+      [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($za, $f.FullName, $rel)
+    }
+  } finally { $za.Dispose() }
+}
+# Отчёт о сбое: error.txt (ошибка, где, стек, версия, телефон), log.txt (весь вывод), что успели собрать, журнал отката — в один .zip
+function Save-CrashReport($er) {
+  try {
+    $mdl = ''; $pr = $script:Props
+    if ($pr -and $pr.Count) { $mdl = [string]$pr['ro.product.model'] }
+    if (-not $mdl) { $mdl = [string]$script:DevModel }
+    $safe = ($mdl -replace '[^A-Za-z0-9_.-]', '_')
+    $name = (@((Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'), 'ERROR', $safe) | Where-Object { $_ }) -join '_'
+    $dir = Join-Path $Root ('reports/' + $name)
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $mode = [string](Get-Variable -Scope Script -Name Mode -ValueOnly -ErrorAction SilentlyContinue)
+    $jn = 0; if ($script:Journal) { $jn = $script:Journal.Count }
+    $os = [Environment]::OSVersion.VersionString
+    if (-not $IsWin) { try { $os = [string](& uname -srm 2>$null) } catch {} }
+    $t = New-Object System.Collections.ArrayList
+    [void]$t.Add("phone-kit $KitVersion - error report")
+    [void]$t.Add('Date: ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    [void]$t.Add('Mode: ' + $mode + '   Lang: ' + $script:Lang + '   Console: ' + [bool](-not $script:WebUi))
+    [void]$t.Add('PowerShell: ' + $PSVersionTable.PSVersion + ' ' + $PSVersionTable.PSEdition + '   OS: ' + $os)
+    if ($pr -and $pr.Count) {
+      [void]$t.Add('Phone: ' + $pr['ro.product.manufacturer'] + ' ' + $mdl + ' (' + $pr['ro.product.device'] + ')   Android ' + $pr['ro.build.version.release'] + ' / SDK ' + $pr['ro.build.version.sdk'])
+      [void]$t.Add('Build: ' + $pr['ro.build.fingerprint'])
+    } elseif ($mdl) { [void]$t.Add('Phone: ' + $mdl) }
+    if ($script:Serial) { [void]$t.Add('Connection: ' + $(if ($script:Serial -match ':\d+$|_adb-tls') { 'Wi-Fi' } else { 'USB' })) }
+    [void]$t.Add('Journal entries (changes that can be undone): ' + $jn)
+    [void]$t.Add('')
+    [void]$t.Add('Error: ' + $er.Exception.Message)
+    [void]$t.Add('Type: ' + $er.Exception.GetType().FullName)
+    if ($er.Exception.InnerException) { [void]$t.Add('Inner: ' + $er.Exception.InnerException.Message) }
+    [void]$t.Add('Id: ' + $er.FullyQualifiedErrorId)
+    [void]$t.Add('Category: ' + $er.CategoryInfo)
+    [void]$t.Add('')
+    [void]$t.Add('Where:')
+    if ($er.InvocationInfo) { [void]$t.Add(([string]$er.InvocationInfo.PositionMessage)) }
+    [void]$t.Add('')
+    [void]$t.Add('Stack:')
+    [void]$t.Add([string]$er.ScriptStackTrace)
+    $enc = New-Object Text.UTF8Encoding($true)
+    [IO.File]::WriteAllText((Join-Path $dir 'error.txt'), (($t -join "`n") -replace "\r?\n", "`r`n"), $enc)
+    [IO.File]::WriteAllText((Join-Path $dir 'log.txt'), ($script:LogBuf -join "`r`n"), $enc)
+    # что набор успел собрать в этом прогоне (отчёт, сырые данные телефона) и журнал для отката
+    $runDir = Get-Variable -Scope Script -Name RepDir -ValueOnly -ErrorAction SilentlyContinue
+    if (-not $runDir) { $runDir = $script:StDir }
+    if ($runDir -and (Test-Path -LiteralPath $runDir)) { try { Copy-Item -LiteralPath $runDir -Destination (Join-Path $dir 'run') -Recurse -Force } catch {} }
+    foreach ($f in @($script:StateFiles)) { if ($f -and (Test-Path -LiteralPath $f)) { try { Copy-Item -LiteralPath $f -Destination (Join-Path $dir 'journal.json') -Force } catch {}; break } }
+    $zip = $dir + '.zip'
+    Zip-Dir $dir $zip
+    return $zip
+  } catch { return $null }
+}
+function Show-Crash($er) {
+  $msg = [string]$er.Exception.Message
+  Write-Host ''
+  Bad ((L 'e001') + ' ' + $msg)
+  if ($er.InvocationInfo) { $pm = [string]$er.InvocationInfo.PositionMessage; Write-Host $pm -ForegroundColor DarkGray; Add-LogBuf $pm }
+  $zip = Save-CrashReport $er
+  $jn = 0; if ($script:Journal) { $jn = $script:Journal.Count }
+  Write-Host ''
+  if ($zip) {
+    Say ('  ' + (L 'e002')) 'Yellow'
+    Say ('  ' + $zip) 'White'
+  } else { Warn (L 'e004') }
+  if ($jn -gt 0) { Warn (L 'e003' $jn) }
+  Emit 'crash' @{ zip = [string]$zip; msg = $msg; journal = $jn }
+  if ($zip) {
+    Set-OpenPath 'crash' $zip
+    if (-not $NoPause -and -not $script:WebUi) { Open-InFolder $zip }
+  }
+}
+# Любая непойманная ошибка: не просто красный текст, а архив для мастера и понятное сообщение
+trap {
+  if ($script:InCrash) { break }
+  $script:InCrash = $true
+  try { Show-Crash $_ } catch { try { Write-Host ('ERROR: ' + $_) -ForegroundColor Red } catch {} }
+  Finish 1
+}
+# Проверка отчёта о сбое в тестах: PHONEKIT_TEST_CRASH=diag|storage вызывает ту же ошибку, что была в 1.2 (Fmt-Bytes с массивом)
+function Test-CrashHook([string]$at) { if ($env:PHONEKIT_TEST_CRASH -eq $at) { [void](Fmt-Bytes @([int64]1, [int64]2)) } }
+
 
 # ----------------------------------------------------------------- adb
 
@@ -1366,26 +1490,32 @@ function Invoke-Optimization {
 
   $animNow = $set['anim_w']
   if ($animNow -notin @('0.5', '0.5f', '0', '0.0')) { AddItem 'anim' '' (L 'm174' $(if ($animNow -and $animNow -ne 'null') { $animNow } else { '1x' })) $true (L 'm175') }
-  if ($set['dns_mode'] -ne 'hostname') {
-    # Оба варианта; профиль «Ребёнок» на странице отмечает семейный. Отмечены оба — берётся семейный.
-    if ($kids) { AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175'); AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false (L 'm175') }
-    else { AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false (L 'm175'); AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175') }
-  }
+  # Семейный DNS — в настройках, обычный (режет рекламу) — в разделе «Реклама». Профиль «Ребёнок» на странице отмечает семейный; отмечены оба — берётся семейный.
+  $dnsFree = ($set['dns_mode'] -ne 'hostname')
+  if ($dnsFree) { AddItem 'dns' 'family.adguard-dns.com' (L 'm176') $false (L 'm175') }
   $cacheTxt = (L 'm178')
   if ($cacheMb -gt 0) { $cacheTxt += (L 'm179' $cacheMb) }
   $cacheTxt += (L 'm180')
   AddItem 'cache' '' $cacheTxt ($dataPct -ge 85) (L 'm175')
 
-  foreach ($s in $suspOk) { AddItem 'third' $s.Pkg ((L 'm181' $($s.Pkg) $($s.Why))) $false (L 'm182') }
-
-  foreach ($c in $candOk) {
+  $gAds = (L 'a001')
+  if ($dnsFree) { AddItem 'dns' 'dns.adguard-dns.com' (L 'm177') $false $gAds }
+  $candText = { param($c)
     $txt = (L 'm183' $($c.Pkg))
     if ($c.Note) { $txt += " — $($c.Note)" }
     if ($c.Mb -gt 0) { $txt += (L 'm184' $($c.Mb)) }
     if ($c.Ask) { $txt += "  ($($c.Ask))" }
     if ($c.Tier -eq 'base') { $txt += (L 'm185') }
+    return $txt
+  }
+  foreach ($c in @($candOk | Where-Object { $script:AdsSet.Contains($_.Pkg) })) { AddItem 'disable' $c.Pkg (& $candText $c) ($c.Tier -eq 'auto') $gAds $c.Tier }
+
+  foreach ($s in $suspOk) { AddItem 'third' $s.Pkg ((L 'm181' $($s.Pkg) $($s.Why))) $false (L 'm182') }
+
+  foreach ($c in $candOk) {
+    if ($script:AdsSet.Contains($c.Pkg)) { continue }
     $grp = @{ 'auto' = (L 'm186'); 'base' = (L 'm187'); 'ask' = (L 'm188') }[$c.Tier]
-    AddItem 'disable' $c.Pkg $txt ($c.Tier -eq 'auto') $grp $c.Tier
+    AddItem 'disable' $c.Pkg (& $candText $c) ($c.Tier -eq 'auto') $grp $c.Tier
   }
   foreach ($b in $bgCands) { AddItem 'bg' $b.Pkg ((L 'm190' $($b.Pkg) $(if ($b.Mb -gt 0) { (L 'm189' $($b.Mb)) }))) $true (L 'm191') }
 
@@ -1582,6 +1712,7 @@ function Invoke-Restore {
   $stamp2 = Get-Date -Format 'yyyy-MM-dd_HH-mm'
   $rd = Join-Path $Root ("reports/" + $stamp2 + '_restore_' + ($mdl -replace '[^A-Za-z0-9_.-]', '_'))
   New-Item -ItemType Directory -Force -Path $rd | Out-Null
+  $script:StDir = $rd
   $script:ChangeLog = Join-Path $rd 'changes.log'
   $script:OptLines = New-Object System.Collections.ArrayList
   $script:StateFiles = @($g.Group | ForEach-Object { $_.File })
@@ -1712,6 +1843,7 @@ function Invoke-Storage {
   $rn = ((Get-Date -Format 'yyyy-MM-dd_HH-mm'), $safeL, $safeM, 'storage' | Where-Object { $_ }) -join '_'
   $rd = Join-Path $Root ("reports/" + $rn)
   New-Item -ItemType Directory -Force -Path $rd | Out-Null
+  $script:StDir = $rd
   $script:ChangeLog = Join-Path $rd 'changes.log'
   $script:OptLines = New-Object System.Collections.ArrayList
   $total = 0; $free0 = 0
@@ -1752,6 +1884,7 @@ function Invoke-Storage {
     AddS 'big' $f.Path (L 'k021' ($f.Path.Substring(8)) (Fmt-Bytes $f.Size) $when) $false $gB $f.Size @($f.Path) $f
   }
   Save-Raw2 $rd 'storage_scan.txt' ((@($duKb.Keys | Sort-Object | ForEach-Object { "{0}`t{1}" -f $duKb[$_], $_ }) + @('') + @($big | ForEach-Object { "{0}`t{1}" -f $_.Size, $_.Path })) -join "`n")
+  Test-CrashHook 'storage'
 
   # --- план
   Emit 'stage' @{ s = 'plan' }
@@ -1883,7 +2016,11 @@ function Invoke-Storage {
   $repTxt = Join-Path $rd 'storage.txt'
   [IO.File]::WriteAllText($repTxt, ($txt -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
   Ok (L 'k045' $repTxt)
-  Emit 'report' @{ zip = $repTxt; txt = $repTxt; mode = 'storage'; journal = $script:Journal.Count; dest = $(if ($script:Journal.Count) { $dest } else { '' }) }
+  $stZip = $rd + '.zip'
+  try { Zip-Dir $rd $stZip; Ok (L 'm435' $stZip) } catch { Warn ((L 'm427') + $_.Exception.Message); $stZip = $repTxt }
+  Set-OpenPath 'report' $stZip
+  if ($script:Journal.Count) { Set-OpenPath 'copies' $dest }
+  Emit 'report' @{ zip = $stZip; txt = $repTxt; mode = 'storage'; journal = $script:Journal.Count; dest = $(if ($script:Journal.Count) { $dest } else { '' }) }
   Emit 'stage' @{ s = 'done'; mode = 'storage' }
   if ($IsWin -and $script:Journal.Count -and -not $NoPause) { try { Start-Process explorer.exe -ArgumentList ('"' + $dest + '"') } catch {} }
   elseif ($IsMac -and $script:Journal.Count -and -not $NoPause) { try { & open $dest } catch {} }
@@ -1993,6 +2130,10 @@ Ok "ADB: $script:Adb"
 $ruFile = Join-Path $Root 'data/ru.tsv'
 $uadFile = Join-Path $Root 'data/uad.tsv'
 $ruNote = @{}
+# Службы рекламы и сбора данных производителей (data/ads.tsv) — в плане отдельным разделом «Реклама»
+$script:AdsSet = New-Object 'System.Collections.Generic.HashSet[string]'
+$adsFile = Join-Path $Root 'data/ads.tsv'
+if (Test-Path $adsFile) { foreach ($r in (Import-Csv -Path $adsFile -Delimiter "`t" -Encoding UTF8)) { if ($r.package) { [void]$script:AdsSet.Add($r.package) } } }
 if (Test-Path $ruFile) { foreach ($r in (Import-Csv -Path $ruFile -Delimiter "`t" -Encoding UTF8)) { $script:RuLevel[$r.package] = $r.level; $ruNote[$r.package] = $r.note } }
 # Пояснения к пакетам на языке мастера: data/notes/<код>.tsv (package, note); нет файла — английский
 if ($script:Lang -ne 'ru') {
@@ -2064,7 +2205,8 @@ if (-not (Wait-Authorized $script:Serial)) {
   Show-EnableHelp; Finish 1
 }
 Ok (L 'm253' $script:Serial)
-Emit 'device' @{ model = (Get-Model $script:Serial); serial = $script:Serial; wifi = ($script:Serial -match ':\d+$|_adb-tls') }
+$script:DevModel = Get-Model $script:Serial
+Emit 'device' @{ model = $script:DevModel; serial = $script:Serial; wifi = ($script:Serial -match ':\d+$|_adb-tls') }
 if ((Sh 'getprop ro.build.characteristics') -match 'tv') {
   Warn (L 'm254')
   if (-not (Confirm-Yes (L 'm255') (L 'w016'))) { Finish 0 }
@@ -2077,6 +2219,7 @@ $script:OptLines = New-Object System.Collections.ArrayList
 
 Emit 'stage' @{ s = 'diag'; mode = $Mode }
 Title (L 'm256')
+Test-CrashHook 'diag'
 $propsTxt = Sh 'getprop'
 $script:Props = Parse-Props $propsTxt
 $model = P 'ro.product.model'
@@ -2500,6 +2643,8 @@ if ($kids) { [void]$obs.Add((L 'm342')) }
 if ($owner) { [void]$obs.Add((L 'm343' $owner)) }
 if ($users.Count -gt 1) { [void]$obs.Add((L 'm344' $($users -join ', '))) }
 if ($set['anim_w'] -in @('', 'null', '1', '1.0')) { [void]$obs.Add((L 'm345')) }
+$adsOn = @($sys | Where-Object { $script:AdsSet.Contains($_) -and -not $disabled.Contains($_) } | Sort-Object)
+if ($adsOn.Count) { [void]$obs.Add((L 'a003' $adsOn.Count)) }
 
 # ----------------------------------------------------------------- отчёт
 
@@ -2584,6 +2729,7 @@ W ((L 'm414') -f $netType)
 W ''
 W (L 'm415')
 if ($obs.Count) { foreach ($o in $obs) { W "  - $o" } } else { W (L 'm416') }
+if ($adsOn.Count) { W ''; W (L 'a005'); foreach ($x in $adsOn) { W ('  - ' + (Pkg-Name $x)) } }
 W ''
 W (L 'm417')
 W (L 'm418')
@@ -2666,19 +2812,7 @@ function Save-ClientReport {
 function Save-Report([switch]$NoZip) {
   [IO.File]::WriteAllText($repTxt, ($script:ReportLines -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
   if ($NoZip) { return }
-  try {
-    Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
-    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
-    if (Test-Path $zip) { Remove-Item $zip -Force }
-    $za = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
-    try {
-      $base = (Resolve-Path $RepDir).Path.TrimEnd('\', '/')
-      foreach ($f in (Get-ChildItem -Path $RepDir -Recurse -File)) {
-        $rel = $f.FullName.Substring($base.Length + 1) -replace '\\', '/'
-        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($za, $f.FullName, $rel)
-      }
-    } finally { $za.Dispose() }
-  } catch { Warn ((L 'm427') + $_.Exception.Message) }
+  try { Zip-Dir $RepDir $zip; Set-OpenPath 'report' $zip } catch { Warn ((L 'm427') + $_.Exception.Message) }
 }
 Save-Report -NoZip
 
@@ -2707,6 +2841,10 @@ if ($Mode -eq 'opt') {
   Say (L 'm431') 'Cyan'
   Say (L 'm432') 'Cyan'
   Invoke-Optimization
+  if ($script:Journal) {
+    $adsOff = @($script:Journal | Where-Object { $_.t -in @('disable', 'uninstall') -and $script:AdsSet.Contains([string]$_.pkg) }).Count
+    if ($adsOff -gt 0) { OptLog (L 'a004' $adsOff) 'ok' }
+  }
   if ($script:OptLines.Count) {
     W ''
     W (L 'm433')
