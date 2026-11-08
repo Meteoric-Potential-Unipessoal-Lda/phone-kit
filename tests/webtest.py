@@ -12,7 +12,7 @@ if os.name == 'nt':
     wrap = os.path.join(work, 'adb.cmd')
     open(wrap, 'w').write('@"%s" "%s" %%*\n' % (sys.executable, adb))
     adb = wrap
-env = dict(os.environ, MOCK_BRAND='samsung', MOCK_STATE=os.path.join(work, 'state.json'))
+env = dict(os.environ, MOCK_BRAND='samsung', MOCK_STATE=os.path.join(work, 'state.json'), PHONEKIT_TEST_NOOPEN='1')
 # подставной GitHub: «вышла версия 9.9»
 import http.server, threading
 class Rel(http.server.BaseHTTPRequestHandler):
@@ -91,8 +91,55 @@ ch = urllib.request.urlopen(base + '/api/client?t=' + token, timeout=10).read().
 if 'phone-kit' not in ch or '<html' not in ch: fail('client report not served')
 rep = [e['data'] for e in events if e['type'] == 'report'][0]
 if not os.path.exists(rep['zip']): fail('report zip missing')
+if post('/api/open', {'what': 'report'}).get('ok') is not True: fail('open report folder')
+if post('/api/open', {'what': 'C:/Windows'}).get('ok') is not False: fail('open accepted a path from the page')
 post('/api/close', {})
 try: p.wait(timeout=30)
 except subprocess.TimeoutExpired: fail('kit did not exit after close')
 if p.returncode != 0: fail('exit code %s' % p.returncode)
 print('PASS webtest (%s): %d events, report %s' % (shell, len(events), os.path.basename(rep['zip'])))
+
+# 2) сбой посреди диагностики: страница получает событие crash с архивом, кнопка «Открыть папку» работает
+out = open(os.path.join(work, 'out2.log'), 'wb')
+env2 = dict(env, PHONEKIT_TEST_CRASH='diag')
+args = [shell, '-NoProfile'] + (['-ExecutionPolicy', 'Bypass'] if os.name == 'nt' else []) + \
+       ['-File', os.path.join(kit, 'phonekit.ps1'), '-AdbPath', adb, '-Web', '-NoBrowser', '-Lang', 'ru', '-NoUpdateCheck']
+p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=out, stderr=subprocess.STDOUT, env=env2)
+def fail(msg):
+    print('FAIL', msg)
+    try: p.kill()
+    except Exception: pass
+    print(open(os.path.join(work, 'out2.log'), 'rb').read().decode('utf-8', 'replace')[-3000:])
+    sys.exit(1)
+url = None
+for _ in range(300):
+    time.sleep(0.2)
+    m = re.search(rb'(http://127\.0\.0\.1:\d+/\?t=[a-z0-9]+)', open(os.path.join(work, 'out2.log'), 'rb').read())
+    if m: url = m.group(1).decode(); break
+    if p.poll() is not None: break
+if not url: fail('crash run: no URL in output')
+base, token = url.split('/?t=')
+seq, events, answered = 0, [], set()
+deadline = time.time() + 300
+while time.time() < deadline:
+    st = get('/api/state?since=%d' % seq)
+    events += st['events']; seq = st['seq']
+    q = st.get('question')
+    if q and q['id'] not in answered:
+        answered.add(q['id'])
+        post('/api/answer', {'id': q['id'], 'value': '1' if (q.get('extra') or {}).get('screen') == 'start' else 'crash'})
+    if st.get('finished'): break
+    if p.poll() is not None: fail('crash run: kit exited early, code %s' % p.returncode)
+    time.sleep(0.3)
+else:
+    fail('crash run: timeout')
+cr = [e['data'] for e in events if e['type'] == 'crash']
+if not cr: fail('crash run: no crash event')
+if not cr[0].get('zip') or not os.path.exists(cr[0]['zip']): fail('crash run: crash zip missing')
+if 'Int64' not in cr[0].get('msg', ''): fail('crash run: message %r' % cr[0].get('msg'))
+if post('/api/open', {'what': 'crash'}).get('ok') is not True: fail('crash run: open folder')
+post('/api/close', {})
+try: p.wait(timeout=30)
+except subprocess.TimeoutExpired: fail('crash run: kit did not exit after close')
+if p.returncode != 1: fail('crash run: exit code %s (expected 1)' % p.returncode)
+print('PASS webtest crash (%s): %s' % (shell, os.path.basename(cr[0]['zip'])))

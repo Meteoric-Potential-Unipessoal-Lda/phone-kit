@@ -42,7 +42,7 @@ def sd_shell(cmd):
     return None
 brand = os.environ.get('MOCK_BRAND', 'samsung')
 SF = os.environ.get('MOCK_STATE', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mockstate.json'))
-SERIAL = 'R58N123ABC' if brand == 'samsung' else 'a1b2c3d4'
+SERIAL = {'samsung': 'R58N123ABC', 'realme': '60202e69'}.get(brand, 'a1b2c3d4')
 st = {'disabled': ['com.samsung.android.app.watchmanagerstub'] if brand == 'samsung' else [], 'uninst': [], 'settings': {}, 'appops': {}, 'boot': 1}
 if os.path.exists(SF):
     st = json.load(open(SF))
@@ -64,6 +64,15 @@ if brand == 'samsung':
       'persist.radio.imei': '356789012345678'}
     home = 'com.sec.android.app.launcher/com.sec.android.app.launcher.activities.LauncherActivity'
     ime = 'com.samsung.android.honeyboard/.service.HoneyBoardService'
+elif brand == 'realme':
+    sysp = common_sys + ['com.android.launcher', 'com.heytap.pictorial', 'com.nearme.statistics.rom', 'com.heytap.market', 'com.heytap.browser',
+      'com.coloros.assistantscreen', 'com.realme.securitycheck', 'com.coloros.safecenter', 'com.oplus.battery', 'com.heytap.cloud', 'com.coloros.gallery3d']
+    props = {'ro.product.model': 'RMX2063', 'ro.product.brand': 'realme', 'ro.product.manufacturer': 'realme', 'ro.product.device': 'RMX2063L1',
+      'ro.build.version.sdk': '31', 'ro.build.version.release': '12', 'ro.build.version.security_patch': '2023-05-05', 'ro.build.version.realmeui': 'V3.0',
+      'ro.build.characteristics': 'default', 'ro.serialno': SERIAL, 'ro.boot.verifiedbootstate': 'green',
+      'ro.build.fingerprint': 'realme/RMX2063/RMX2063L1:12/SKQ1/R.202305:user/release-keys'}
+    home = 'com.android.launcher/com.android.launcher.Launcher'
+    ime = 'com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME'
 else:
     sysp = common_sys + ['com.miui.home', 'com.miui.msa.global', 'com.miui.analytics', 'com.miui.daemon', 'com.xiaomi.mipicks', 'com.miui.securitycenter',
       'com.lbe.security.miui', 'com.xiaomi.joyose', 'com.miui.powerkeeper', 'com.miui.hybrid', 'com.miui.player', 'com.mi.globalbrowser', 'com.miui.yellowpage',

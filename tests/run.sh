@@ -43,7 +43,7 @@ expect s_rest 'откат завершён'
 nostate samsung 'rubin'
 
 # 3. Xiaomi: прошивка не даёт отключить -> убрать для пользователя 0, DNS, затем откат
-run x_opt xiaomi '2\nРедми\n2\n\nда\n\n\n'
+run x_opt xiaomi '2\nРедми\n4\n\nда\n\n\n'
 expect x_opt 'убран для пользователя com.miui.msa.global'
 expect x_opt 'частный DNS -> dns.adguard-dns.com'
 state xiaomi 'com.miui.msa.global'
@@ -67,13 +67,13 @@ expect x_brk 'откатываю партию и останавливаюсь'
 nostate xiaomi 'com.facebook.services'
 
 # 5. DNS не работает в сети -> автооткат DNS
-MOCK_DNSBROKEN=1 run x_dns xiaomi '2\nТ\n2\n\nда\n\n\n'
+MOCK_DNSBROKEN=1 run x_dns xiaomi '2\nТ\n4\n\nда\n\n\n'
 expect x_dns 'не работает в этой сети'
 nostate xiaomi 'adguard'
 
 # 5б. План: номер у отмеченного снимает галочку -> подсказка и предупреждение перед «да»; «нет» -> ничего не менялось
-run x_tog xiaomi '2\nТ\n7-16\n\nнет\n'
-expect x_tog 'Галочка СНЯТА (не будет сделано): 7 8 9 10 11 12 13 14 15 16'
+run x_tog xiaomi '2\nТ\n5-12 17 18\n\nнет\n'
+expect x_tog 'Галочка СНЯТА (не будет сделано): 5 6 7 8 9 10 11 12 17 18'
 expect x_tog 'С 10 пунктов «реклама, сбор данных, мусор» галочка снята'
 expect x_tog 'Отменено — ничего не менялось'
 nostate xiaomi 'msa.global'
@@ -117,6 +117,8 @@ expect st_mem 'с телефона удалены'
 expect st_mem 'не скопировались'
 expect st_mem 'необычными символами'
 expect st_mem 'Освобождено на телефоне'
+expect st_mem 'Архив:'
+ls "$WORK"/kit-samsung/reports/*_storage.zip >/dev/null 2>&1 && echo "PASS st_mem: архив пункта 4" || { echo "FAIL st_mem: нет архива пункта 4"; FAIL=1; }
 reject st_mem 'Exception'
 fs() { if [ $1 "$2" ]; then echo "PASS st_mem: $3"; else echo "FAIL st_mem: $3"; FAIL=1; fi; }
 fs '! -e' "$SD/DCIM/.thumbnails" 'миниатюры удалены'
@@ -134,6 +136,43 @@ cmp -s "${D}DCIM/Camera/IMG 0002 копия.jpg" /dev/null; [ -s "${D}DCIM/Camer
 MOCK_SDCARD="$SD" run st_rest samsung '3\n\n\nда\n' keep
 expect st_rest 'Возвращено на телефон: 2 файлов'
 [ -e "$SD/DCIM/Camera/IMG_0001.jpg" ] && [ -e "$SD/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-1.jpg" ] && echo "PASS st_rest: файлы вернулись" || { echo "FAIL st_rest: файлы не вернулись"; FAIL=1; }
+
+# 6г. Реклама в прошивке (Realme): раздел в плане, безопасное отмечено само, магазин и браузер — только по желанию
+run r_opt realme '2\nТест\n\nда\n\nнет\n'
+expect r_opt 'Реклама и сбор данных в прошивке: работает служб'
+expect r_opt '--- Реклама и сбор данных в прошивке ---'
+expect r_opt 'отключён com.heytap.pictorial'
+expect r_opt 'отключён com.nearme.statistics.rom'
+expect r_opt 'Реклама в прошивке: отключено служб — 5'
+reject r_opt 'Exception'
+state realme 'com.heytap.pictorial'
+nostate realme 'com.heytap.market'
+nostate realme 'com.heytap.browser'
+grep -q 'Службы рекламы и сбора данных производителя' "$WORK"/kit-realme/reports/*/report.txt && echo "PASS r_opt: реклама в отчёте" || { echo "FAIL r_opt: нет рекламы в отчёте"; FAIL=1; }
+
+# 6д. Отчёт о сбое: непойманная ошибка -> понятное сообщение и архив (ошибка, где, вывод, собранное, журнал)
+zcheck() {  # zcheck NAME ZIPGLOB файл-в-архиве текст
+  local z; z=$(ls -t $2 2>/dev/null | head -1)
+  if [ -n "$z" ] && python3 - "$z" "$3" "$4" <<'PY'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); names = z.namelist()
+hit = [n for n in names if n == sys.argv[2] or n.startswith(sys.argv[2])]
+sys.exit(0 if hit and sys.argv[3].encode() in z.read(hit[0]) else 1)
+PY
+  then echo "PASS $1: $3 содержит «$4»"; else echo "FAIL $1: в архиве нет $3 с «$4» ($z)"; FAIL=1; fi
+}
+PHONEKIT_TEST_CRASH=diag run c_diag realme '1\nТест\n'
+expect c_diag 'Набор остановился из-за ошибки'
+expect c_diag 'Пришлите этот файл'
+expect c_diag '_ERROR_realme_RMX2063.zip'
+reject c_diag 'Изменения, сделанные до ошибки'
+zcheck c_diag "$WORK/kit-realme/reports/*_ERROR_*.zip" 'error.txt' 'Fmt-Bytes'
+zcheck c_diag "$WORK/kit-realme/reports/*_ERROR_*.zip" 'error.txt' 'Phone: realme RMX2063'
+zcheck c_diag "$WORK/kit-realme/reports/*_ERROR_*.zip" 'log.txt' 'Подключено: 60202e69'
+PHONEKIT_TEST_CRASH=storage run c_st samsung '4\nТест\n' keep
+expect c_st 'Набор остановился из-за ошибки'
+zcheck c_st "$WORK/kit-samsung/reports/*_ERROR_*.zip" 'error.txt' 'Mode: storage'
+zcheck c_st "$WORK/kit-samsung/reports/*_ERROR_*.zip" 'run/' ''
 
 # 7. Пункт U на подставных данных Windows
 if pwsh -NoProfile -File "$ROOT/tests/usbtest.ps1"; then echo "PASS usbtest"; else echo "FAIL usbtest"; FAIL=1; fi
