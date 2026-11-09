@@ -3,6 +3,12 @@
 # Двойной клик по start.command, или в Терминале:  bash ~/Desktop/phone-kit/start.command
 cd "$(dirname "$0")" || exit 1
 KIT="$(pwd)"
+# Антивирус иногда удаляет phonekit.ps1 — говорим об этом прямо, а не невнятной ошибкой
+if [ ! -f "$KIT/phonekit.ps1" ]; then
+  echo "Нет файла phonekit.ps1 — скорее всего, его удалил антивирус."
+  echo "Верните файл из карантина антивируса или скачайте набор заново: https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest"
+  read -r -p "Enter — закрыть" _; exit 1
+fi
 
 # Файлы, пришедшие через AnyDesk/интернет, macOS помечает карантином — снимаем только с этой папки
 xattr -dr com.apple.quarantine "$KIT" 2>/dev/null

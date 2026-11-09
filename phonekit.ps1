@@ -49,7 +49,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $script:BoundArgs = @{}; foreach ($k in $PSBoundParameters.Keys) { $script:BoundArgs[$k] = $PSBoundParameters[$k] }
 $script:UpdateInfo = $null
-$KitVersion = '1.3'
+$KitVersion = '1.4'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -115,7 +115,12 @@ function Ask([string]$prompt, [string]$kind = 'text', $options = $null, $extra =
 }
 function Ask-Core([string]$prompt, [string]$kind, $options, $extra) {
   $w = $script:WebUi
-  if (-not $w) { return ([string](Read-Host $prompt)).Trim() }
+  if (-not $w) {
+    # ввод закрыт (запуск без окна, конец перенаправленного ввода) — выходим спокойно, это не сбой набора
+    $r = $null; try { $r = Read-Host $prompt } catch {}
+    if ($null -eq $r) { Write-Host ''; Write-Host '  (no input)' -ForegroundColor DarkGray; $script:InCrash = $true; Finish 2 }
+    return ([string]$r).Trim()
+  }
   $id = [guid]::NewGuid().ToString('N').Substring(0, 10)
   $q = [ordered]@{ id = $id; prompt = $prompt; kind = $kind; options = $options; extra = $extra }
   [System.Threading.Monitor]::Enter($w.SyncRoot)
@@ -337,6 +342,36 @@ function Finish([int]$code) {
   elseif (-not $NoPause) { Write-Host ''; [void](Read-Host (L 'm001')) }
   exit $code
 }
+# Антивирус иногда удаляет файлы набора (чаще всего phonekit.ps1, start.bat или страницу) — говорим об этом прямо
+$KitReleaseUrl = 'https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest'
+function Test-KitFiles {
+  $need = @('data/uad.tsv', 'data/ru.tsv', 'data/ads.tsv', 'data/lang/ru.json', 'data/lang/en.json')
+  if (-not $Console) { $need = @('ui/index.html') + $need }
+  if ($IsWin) { $need += 'start.bat' } elseif ($IsMac) { $need += 'start.command' }
+  $miss = @($need | Where-Object { -not (Test-Path -LiteralPath (Join-Path $Root $_)) })
+  # Журнал Защитника Windows: находил ли он что-то в папке набора (если командлет есть и доступен)
+  $hits = @()
+  if ($IsWin -and -not $env:PHONEKIT_TEST_NODEFENDER) {
+    try {
+      $rx = [regex]::Escape($Root)
+      foreach ($d in @(Get-MpThreatDetection -ErrorAction Stop)) {
+        $res = @($d.Resources | Where-Object { $_ -match $rx })
+        if ($res.Count) {
+          $nm = ''; try { $nm = [string](Get-MpThreat -ThreatID $d.ThreatID -ErrorAction Stop | Select-Object -First 1).ThreatName } catch {}
+          $hits += ('{0} ({1})' -f (($res | ForEach-Object { ($_ -replace '^\w+:', '') | Split-Path -Leaf }) -join ', '), $(if ($nm) { $nm } else { 'ID ' + $d.ThreatID }))
+        }
+      }
+    } catch {}
+  }
+  if (-not $miss.Count -and -not $hits.Count) { return }
+  if ($miss.Count) {
+    Warn (L 'av001' ($miss -join ', '))
+    if (-not $script:TrRu -or -not $script:TrRu.Count) { Warn ('Kit files are missing: ' + ($miss -join ', ') + ' - probably removed by antivirus. Download the kit again: ' + $KitReleaseUrl) }
+  }
+  if ($hits.Count) { Warn (L 'av003' ($hits -join '; ')) }
+  if ($IsWin) { Warn (L 'av002') }
+  Warn (L 'av004' $KitReleaseUrl)
+}
 function Set-OpenPath([string]$what, [string]$path) { if ($script:WebUi -and $path) { $script:WebUi.open[$what] = $path } }
 function Open-InFolder([string]$p) {
   if ($env:PHONEKIT_TEST_NOOPEN) { return }
@@ -499,7 +534,8 @@ $ReadOnlyPatterns = @(
   '^dumpsys batterystats$',
   '^pm list packages -U$',
   '^du -s -k( /sdcard/[A-Za-z0-9_./-]+)+$',
-  "^find /sdcard(/[A-Za-z0-9_./-]*)? -type f( -size \+\d+M)? -exec stat -c '%s %Y %n' \{\} \+$"
+  "^find /sdcard(/[A-Za-z0-9_./-]*)? -type f( -size \+\d+M)? -exec stat -c '%s %Y %n' \{\} \+$",
+  "^md5sum( '/sdcard/(?!Android/(data|obb)/)(?![^']*/\.\./)[^']+')+$"
 )
 function Test-ReadOnly([string]$cmd) {
   if ($cmd -match '[;&|<>`$\\"*?]') { return $false }
@@ -1020,7 +1056,7 @@ function Get-Snap {
   try {
     $m = Parse-Meminfo (Sh 'cat /proc/meminfo')
     if ($m['MemAvailable']) { $s.memAvailMb = Mb $m['MemAvailable'] }
-    $s.procs = @(Parse-Ps (Sh $(if ($script:PsCmd) { $script:PsCmd } else { 'ps -A' }))).Count
+    $s.procs = (Parse-Ps (Sh $(if ($script:PsCmd) { $script:PsCmd } else { 'ps -A' }))).Count
     $s.dataFreeMb = Mb (Get-DataFree)
     $s.disabled = (Parse-PkgList (Sh 'pm list packages -d')).Count
   } catch {}
@@ -1883,6 +1919,9 @@ function Invoke-Storage {
     $when = ''; try { $when = ([datetime]'1970-01-01').AddSeconds($f.Mtime).ToLocalTime().ToString('yyyy-MM-dd') } catch {}
     AddS 'big' $f.Path (L 'k021' ($f.Path.Substring(8)) (Fmt-Bytes $f.Size) $when) $false $gB $f.Size @($f.Path) $f
   }
+  Say (L 'k051')
+  $dupR = Find-Dups $rd
+  if ($dupR) { AddS 'dups' 'dups' (L 'k050' $dupR.Count (Fmt-Bytes $dupR.Bytes) $dupR.Groups) $false (L 'k049') $dupR.Bytes @() $dupR.Files }
   Save-Raw2 $rd 'storage_scan.txt' ((@($duKb.Keys | Sort-Object | ForEach-Object { "{0}`t{1}" -f $duKb[$_], $_ }) + @('') + @($big | ForEach-Object { "{0}`t{1}" -f $_.Size, $_.Path })) -join "`n")
   Test-CrashHook 'storage'
 
@@ -1912,7 +1951,7 @@ function Invoke-Storage {
   if ($sel.Count -eq 0) { OptLog (L 'm207'); return }
 
   # --- куда копировать и хватит ли места
-  $moves = @($sel | Where-Object { $_.Kind -in @('move', 'big') })
+  $moves = @($sel | Where-Object { $_.Kind -in @('move', 'big', 'dups') })
   $base = $CopyTo
   if (-not $base) { try { $base = [Environment]::GetFolderPath('MyPictures') } catch {} }
   if (-not $base) { $base = Join-Path $Root 'copies' }
@@ -1927,6 +1966,7 @@ function Invoke-Storage {
     $need = [int64]0
     foreach ($it in $moves) {
       if ($it.Kind -eq 'big') { $inside = $false; foreach ($d in $selDirs) { if ($it.Paths[0].StartsWith($d)) { $inside = $true } }; if ($inside) { continue } }
+      if ($it.Kind -eq 'dups') { foreach ($f in $it.Obj) { $inside = $false; foreach ($d in $selDirs) { if ($f.Path.StartsWith($d)) { $inside = $true } }; if (-not $inside) { $need += $f.Size } }; continue }
       $need += $it.Bytes
     }
     New-Item -ItemType Directory -Force -Path $base | Out-Null
@@ -1970,6 +2010,7 @@ function Invoke-Storage {
   foreach ($it in $moves) {
     $files = New-Object System.Collections.ArrayList
     if ($it.Kind -eq 'big') { [void]$files.Add($it.Obj) }
+    elseif ($it.Kind -eq 'dups') { foreach ($f in $it.Obj) { [void]$files.Add($f) } }
     else { foreach ($d in $it.Paths) { foreach ($f in (Get-RemoteFiles $d)) { [void]$files.Add($f) } } }
     $files = @($files | Where-Object { $_.Path -notmatch '/\.(thumbnails|trashed-|pending-)|/\.nomedia$|/\.trashed-|/\.pending-' -and $seen.Add($_.Path) })
     if ($files.Count -eq 0) { $script:stDone++; & $prog; continue }
@@ -2024,6 +2065,63 @@ function Invoke-Storage {
   Emit 'stage' @{ s = 'done'; mode = 'storage' }
   if ($IsWin -and $script:Journal.Count -and -not $NoPause) { try { Start-Process explorer.exe -ArgumentList ('"' + $dest + '"') } catch {} }
   elseif ($IsMac -and $script:Journal.Count -and -not $NoPause) { try { & open $dest } catch {} }
+}
+# Дубли: одинаковые фото и видео (сначала одинаковый размер, потом md5sum на самом телефоне — только чтение).
+# Оставляем одну копию (в Камере, иначе самую старую), остальные — кандидаты на перенос на компьютер.
+$DupDirs = @('/sdcard/DCIM', '/sdcard/Pictures', '/sdcard/Download', '/sdcard/Movies', '/sdcard/Bluetooth', '/sdcard/Telegram',
+  '/sdcard/Android/media/com.whatsapp/WhatsApp/Media', '/sdcard/WhatsApp/Media', '/sdcard/Android/media/org.telegram.messenger',
+  '/sdcard/Android/media/com.viber.voip', '/sdcard/viber/media')
+$DupMedia = '(?i)\.(jpe?g|png|heic|heif|webp|gif|dng|mp4|mov|3gp|mkv|avi|webm)$'
+function Find-Dups([string]$rd) {
+  $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+  $bySize = @{}
+  foreach ($d in $DupDirs) {
+    $lst = Get-RemoteFiles $d
+    foreach ($f in $lst) {
+      if ($f.Size -lt 20KB -or $f.Path -notmatch $DupMedia -or $f.Path -match '/\.(thumbnails|trashed-|pending-)' -or -not (Test-SafeRemote $f.Path)) { continue }
+      if (-not $seen.Add($f.Path)) { continue }
+      $k = [string]$f.Size
+      if (-not $bySize.ContainsKey($k)) { $bySize[$k] = New-Object System.Collections.ArrayList }
+      [void]$bySize[$k].Add($f)
+    }
+  }
+  # кандидаты — файлы с одинаковым размером; ограничение, чтобы не считать md5 часами: 4000 файлов / 6 ГБ, начиная с крупных
+  $cand = New-Object System.Collections.ArrayList; $tot = [int64]0
+  foreach ($k in @($bySize.Keys | Sort-Object { [int64]$_ } -Descending)) {
+    $g = $bySize[$k]; if ($g.Count -lt 2) { continue }
+    $gb = [int64]$k * $g.Count
+    if ($cand.Count + $g.Count -gt 4000 -or $tot + $gb -gt 6GB) { continue }
+    foreach ($f in $g) { [void]$cand.Add($f) }; $tot += $gb
+  }
+  if ($cand.Count -eq 0) { return $null }
+  $sum = @{}; $batch = New-Object System.Collections.ArrayList; $len = 0
+  for ($i = 0; $i -le $cand.Count; $i++) {
+    $p = $null; if ($i -lt $cand.Count) { $p = $cand[$i].Path }
+    if ($batch.Count -and ($null -eq $p -or $batch.Count -ge 40 -or $len + $p.Length -gt 6000)) {
+      $out = Sh ('md5sum ' + (($batch | ForEach-Object { "'" + $_ + "'" }) -join ' ')) 300
+      foreach ($l in ($out -split "`n")) { if ($l -match '^([0-9a-f]{32})\s+(/sdcard/.+)$') { $sum[$Matches[2]] = $Matches[1] } }
+      $batch.Clear(); $len = 0
+    }
+    if ($p) { [void]$batch.Add($p); $len += $p.Length + 3 }
+  }
+  $groups = @{}
+  foreach ($f in $cand) {
+    $h = $sum[$f.Path]; if (-not $h) { continue }
+    $k = [string]$f.Size + ':' + $h
+    if (-not $groups.ContainsKey($k)) { $groups[$k] = New-Object System.Collections.ArrayList }
+    [void]$groups[$k].Add($f)
+  }
+  $extra = New-Object System.Collections.ArrayList; $bytes = [int64]0; $ng = 0; $lines = New-Object System.Collections.ArrayList
+  foreach ($k in $groups.Keys) {
+    $g = @($groups[$k]); if ($g.Count -lt 2) { continue }
+    $ng++
+    $keep = @($g | Sort-Object @{ e = { if ($_.Path -like '/sdcard/DCIM/Camera/*') { 0 } else { 1 } } }, @{ e = { $_.Mtime } }, @{ e = { $_.Path.Length } })[0]
+    [void]$lines.Add('= ' + $keep.Path)
+    foreach ($f in $g) { if ($f.Path -ne $keep.Path) { [void]$extra.Add($f); $bytes += $f.Size; [void]$lines.Add('  ' + $f.Path) } }
+  }
+  if ($extra.Count -eq 0) { return $null }
+  Save-Raw2 $rd 'duplicates.txt' ($lines -join "`n")
+  return [pscustomobject]@{ Count = $extra.Count; Groups = $ng; Bytes = $bytes; Files = @($extra) }
 }
 function Save-Raw2([string]$dir, [string]$name, [string]$txt) {
   try { [IO.File]::WriteAllText((Join-Path $dir $name), $txt, (New-Object Text.UTF8Encoding($false))) } catch {}
@@ -2123,6 +2221,7 @@ if ($Prepare) { Invoke-Prepare }
 Clear-Host
 Say (L 'm242' $KitVersion) 'Cyan'
 Say ((L 'm243' $Root))
+Test-KitFiles
 $script:Adb = Get-AdbBinary
 Ok "ADB: $script:Adb"
 
