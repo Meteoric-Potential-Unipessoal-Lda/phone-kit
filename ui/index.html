@@ -357,7 +357,7 @@ main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
     if (it.kind === 'third') return ['ui_tag_sec', '#FFFAEB', '#B54708'];
     if (it.kind === 'bg') return ['ui_tag_bg', '#F2F4F7', '#344054'];
     if (it.kind === 'junk' || it.kind === 'cache' || it.kind === 'apk') return ['ui_tag_junk', '#FEF3F2', '#B42318'];
-    if (it.kind === 'move' || it.kind === 'big') return ['ui_tag_move', '#EFF8FF', '#175CD3'];
+    if (it.kind === 'move' || it.kind === 'big' || it.kind === 'dups') return ['ui_tag_move', '#EFF8FF', '#175CD3'];
     return ['ui_tag_set', '#F2F4F7', '#344054'];
   }
   function qPlan(items, ex) {
