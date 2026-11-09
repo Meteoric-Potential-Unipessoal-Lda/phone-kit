@@ -727,5 +727,12 @@
  "a001": "Firmware ads and data collection",
  "a003": "Firmware ads and data collection: {0} services running. You can turn them off in option 2 (section “Ads”).",
  "a004": "Firmware ads: {0} services turned off",
- "a005": "Manufacturer ad and data collection services (enabled):"
+ "a005": "Manufacturer ad and data collection services (enabled):",
+ "av001": "Kit files are missing: {0}",
+ "av002": "If antivirus removed them, you can restore them: Windows Security → Virus & threat protection → Protection history → select the entry → Actions → Restore. To prevent it, add the kit folder to the antivirus exclusions.",
+ "av003": "Windows Defender flagged files in the kit folder: {0}. The kit is open source — this is a false positive on a PowerShell script.",
+ "av004": "Or download the kit again: {0}",
+ "k049": "Duplicates (identical photos and videos)",
+ "k050": "Duplicate photos and videos — extra copies: {0} (groups: {2}), {1}; copies go to the computer, one stays on the phone",
+ "k051": "Looking for identical photos and videos (duplicates)…"
 }

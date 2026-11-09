@@ -727,5 +727,12 @@
  "a001": "Werbung und Datensammlung in der Firmware",
  "a003": "Werbung und Datensammlung in der Firmware: {0} Dienste aktiv. Du kannst sie in Punkt 2 abschalten (Abschnitt „Werbung“).",
  "a004": "Werbung in der Firmware: {0} Dienste abgeschaltet",
- "a005": "Werbe- und Datensammeldienste des Herstellers (aktiv):"
+ "a005": "Werbe- und Datensammeldienste des Herstellers (aktiv):",
+ "av001": "Es fehlen Dateien des Kits: {0}",
+ "av002": "Wenn der Virenschutz sie entfernt hat, kannst du sie wiederherstellen: Windows-Sicherheit → Viren- & Bedrohungsschutz → Schutzverlauf → Eintrag wählen → Aktionen → Wiederherstellen. Damit es nicht wieder passiert, füge den Kit-Ordner zu den Ausnahmen des Virenschutzes hinzu.",
+ "av003": "Windows Defender hat Dateien im Kit-Ordner gemeldet: {0}. Das Kit ist Open Source – das ist ein Fehlalarm bei einem PowerShell-Skript.",
+ "av004": "Oder lade das Kit neu herunter: {0}",
+ "k049": "Duplikate (identische Fotos und Videos)",
+ "k050": "Doppelte Fotos und Videos — überzählige Kopien: {0} (Gruppen: {2}), {1}; die Kopien kommen auf den Computer, eine bleibt auf dem Telefon",
+ "k051": "Suche identische Fotos und Videos (Duplikate)…"
 }

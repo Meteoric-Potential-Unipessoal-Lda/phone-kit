@@ -727,5 +727,12 @@
  "a001": "Reklamy i zbieranie danych w oprogramowaniu",
  "a003": "Reklamy i zbieranie danych w oprogramowaniu: działa usług — {0}. Można je wyłączyć w opcji 2 (sekcja „Reklamy”).",
  "a004": "Reklamy w oprogramowaniu: wyłączono usług — {0}",
- "a005": "Usługi reklamowe i zbierające dane producenta (włączone):"
+ "a005": "Usługi reklamowe i zbierające dane producenta (włączone):",
+ "av001": "Brakuje plików zestawu: {0}",
+ "av002": "Jeśli usunął je antywirus, można je przywrócić: Zabezpieczenia Windows → Ochrona przed wirusami i zagrożeniami → Historia ochrony → wybierz wpis → Akcje → Przywróć. Żeby się nie powtarzało, dodaj folder zestawu do wykluczeń antywirusa.",
+ "av003": "Windows Defender zgłosił pliki w folderze zestawu: {0}. Zestaw ma otwarty kod — to fałszywy alarm na skrypt PowerShell.",
+ "av004": "Albo pobierz zestaw ponownie: {0}",
+ "k049": "Duplikaty (identyczne zdjęcia i filmy)",
+ "k050": "Zduplikowane zdjęcia i filmy — zbędnych kopii: {0} (grup: {2}), {1}; kopie trafiają na komputer, na telefonie zostaje po jednej",
+ "k051": "Szukam identycznych zdjęć i filmów (duplikatów)…"
 }

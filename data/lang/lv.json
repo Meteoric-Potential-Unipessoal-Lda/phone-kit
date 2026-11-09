@@ -727,5 +727,12 @@
  "a001": "Reklāmas un datu vākšana programmaparatūrā",
  "a003": "Reklāmas un datu vākšana programmaparatūrā: darbojas {0} pakalpojumi. Tos var izslēgt 2. punktā (sadaļa „Reklāmas”).",
  "a004": "Reklāmas programmaparatūrā: izslēgti {0} pakalpojumi",
- "a005": "Ražotāja reklāmu un datu vākšanas pakalpojumi (ieslēgti):"
+ "a005": "Ražotāja reklāmu un datu vākšanas pakalpojumi (ieslēgti):",
+ "av001": "Trūkst komplekta failu: {0}",
+ "av002": "Ja tos izdzēsa antivīruss, failus var atjaunot: Windows drošība → Aizsardzība pret vīrusiem un apdraudējumiem → Aizsardzības vēsture → izvēlēties ierakstu → Darbības → Atjaunot. Lai tas neatkārtotos, pievienojiet komplekta mapi antivīrusa izņēmumiem.",
+ "av003": "Windows Defender reaģēja uz failiem komplekta mapē: {0}. Komplektam ir atvērts kods — tā ir kļūdaina trauksme uz PowerShell skriptu.",
+ "av004": "Vai lejupielādējiet komplektu no jauna: {0}",
+ "k049": "Dublikāti (vienādi foto un video)",
+ "k050": "Foto un video dublikāti — liekās kopijas: {0} (grupas: {2}), {1}; kopijas aiziet uz datoru, tālrunī paliek pa vienai",
+ "k051": "Meklēju vienādus foto un video (dublikātus)…"
 }

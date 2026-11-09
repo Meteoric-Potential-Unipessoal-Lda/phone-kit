@@ -727,5 +727,12 @@
  "a001": "Pubblicità e raccolta dati nel firmware",
  "a003": "Pubblicità e raccolta dati nel firmware: {0} servizi attivi. Puoi disattivarli nell'opzione 2 (sezione «Pubblicità»).",
  "a004": "Pubblicità nel firmware: {0} servizi disattivati",
- "a005": "Servizi di pubblicità e raccolta dati del produttore (attivi):"
+ "a005": "Servizi di pubblicità e raccolta dati del produttore (attivi):",
+ "av001": "Mancano file del kit: {0}",
+ "av002": "Se li ha rimossi l'antivirus, puoi ripristinarli: Sicurezza di Windows → Protezione da virus e minacce → Cronologia protezione → scegli la voce → Azioni → Ripristina. Per evitarlo, aggiungi la cartella del kit alle esclusioni dell'antivirus.",
+ "av003": "Windows Defender ha segnalato file nella cartella del kit: {0}. Il kit è open source: è un falso positivo su uno script PowerShell.",
+ "av004": "Oppure scarica di nuovo il kit: {0}",
+ "k049": "Duplicati (foto e video identici)",
+ "k050": "Foto e video duplicati — copie in più: {0} (gruppi: {2}), {1}; le copie vanno sul computer, sul telefono ne resta una",
+ "k051": "Cerco foto e video identici (duplicati)…"
 }
