@@ -16,7 +16,7 @@ run() {
   cp "$ROOT/phonekit.ps1" "$kit/"; cp "$ROOT"/data/*.tsv "$kit/data/"; mkdir -p "$kit/data/lang"; cp "$ROOT"/data/lang/*.json "$kit/data/lang/"
   export MOCK_BRAND=$brand MOCK_STATE="$WORK/$brand.json"
   [ -z "$keep" ] && rm -f "$MOCK_STATE"
-  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoUpdateCheck -NoPause ${KIT_ARGS:-} > "$WORK/$name.log" 2>&1
+  printf "$input" | timeout 600 pwsh -NoProfile -File "$kit/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoUpdateCheck -NoPause -Console ${KIT_ARGS:-} > "$WORK/$name.log" 2>&1
 }
 # expect NAME "текст" — текст должен быть в выводе; reject NAME "текст" — не должен
 expect() { if grep -qF -- "$2" "$WORK/$1.log"; then echo "PASS $1: $2"; else echo "FAIL $1: нет «$2»"; FAIL=1; fi; }
@@ -50,6 +50,7 @@ state xiaomi 'com.miui.msa.global'
 grep -q '12. БЫЛО / СТАЛО' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: было / стало" || { echo "FAIL x_opt: нет «было / стало»"; FAIL=1; }
 grep -q 'Что занимает память' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: раздел памяти" || { echo "FAIL x_opt: нет раздела памяти"; FAIL=1; }
 grep -q 'Расход батареи по приложениям' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: расход батареи" || { echo "FAIL x_opt: нет расхода батареи"; FAIL=1; }
+awk '/Запущено процессов/ { if ($3+0 > 1) ok=1 } END { exit ok?0:1 }' "$WORK"/kit-xiaomi/reports/*/report.txt && echo "PASS x_opt: число процессов в «было / стало»" || { echo "FAIL x_opt: число процессов в «было / стало» = 1"; FAIL=1; }
 ls "$WORK"/kit-xiaomi/reports/*/client_report.html >/dev/null 2>&1 && echo "PASS x_opt: отчёт для клиента" || { echo "FAIL x_opt: нет client_report.html"; FAIL=1; }
 # 3б. Выборочный откат: только запись 1 (настройка анимации), остальное остаётся в журнале
 run x_part xiaomi '3\n\n1\nда\n' keep
@@ -137,6 +138,26 @@ MOCK_SDCARD="$SD" run st_rest samsung '3\n\n\nда\n' keep
 expect st_rest 'Возвращено на телефон: 2 файлов'
 [ -e "$SD/DCIM/Camera/IMG_0001.jpg" ] && [ -e "$SD/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-1.jpg" ] && echo "PASS st_rest: файлы вернулись" || { echo "FAIL st_rest: файлы не вернулись"; FAIL=1; }
 
+# 6в2. Дубли: одинаковые фото в разных папках (md5 на телефоне), лишние копии — на компьютер, на телефоне остаётся одна
+SD2="$WORK/sdcard2"; CP2="$WORK/copies2"; rm -rf "$SD2" "$CP2"
+mkdir -p "$SD2/DCIM/Camera" "$SD2/Bluetooth" "$SD2/Pictures/Telegram"
+head -c 300000 /dev/urandom > "$SD2/DCIM/Camera/A.jpg"; cp "$SD2/DCIM/Camera/A.jpg" "$SD2/Bluetooth/A копия.jpg"
+head -c 300000 /dev/urandom > "$SD2/DCIM/Camera/C.jpg"   # тот же размер, другое содержимое — не дубль
+head -c 200000 /dev/urandom > "$SD2/Pictures/Telegram/B.jpg"; cp "$SD2/Pictures/Telegram/B.jpg" "$SD2/Bluetooth/B.jpg"
+touch -d '2024-01-01' "$SD2/Pictures/Telegram/B.jpg"
+MOCK_SDCARD="$SD2" KIT_ARGS="-CopyTo $CP2" run st_dup samsung '4\nТест\n2\n\nда\n'
+expect st_dup 'Дубли фото и видео — лишних копий: 2 (групп: 2)'
+expect st_dup '«Дубли фото и видео»: скопировано и проверено 2 файлов'
+reject st_dup 'Exception'
+fd() { if [ $1 "$2" ]; then echo "PASS st_dup: $3"; else echo "FAIL st_dup: $3"; FAIL=1; fi; }
+fd '-e' "$SD2/DCIM/Camera/A.jpg" 'оригинал в Камере остался'
+fd '! -e' "$SD2/Bluetooth/A копия.jpg" 'копия A ушла с телефона'
+fd '-e' "$SD2/DCIM/Camera/C.jpg" 'файл того же размера, но другой — не тронут'
+fd '-e' "$SD2/Pictures/Telegram/B.jpg" 'самый старый B остался'
+fd '! -e' "$SD2/Bluetooth/B.jpg" 'копия B ушла с телефона'
+D2=$(ls -d "$CP2"/*/ 2>/dev/null | head -1)
+fd '-e' "${D2}Bluetooth/A копия.jpg" 'копия A на компьютере'
+
 # 6г. Реклама в прошивке (Realme): раздел в плане, безопасное отмечено само, магазин и браузер — только по желанию
 run r_opt realme '2\nТест\n\nда\n\nнет\n'
 expect r_opt 'Реклама и сбор данных в прошивке: работает служб'
@@ -173,6 +194,33 @@ PHONEKIT_TEST_CRASH=storage run c_st samsung '4\nТест\n' keep
 expect c_st 'Набор остановился из-за ошибки'
 zcheck c_st "$WORK/kit-samsung/reports/*_ERROR_*.zip" 'error.txt' 'Mode: storage'
 zcheck c_st "$WORK/kit-samsung/reports/*_ERROR_*.zip" 'run/' ''
+
+# 6е. «Большой» телефон: 400 системных пакетов из базы + 400 приложений; 1500 фото и 30 дублей
+MOCK_BIG=400 run b_opt xiaomi '2\nТ\n\nда\n\nнет\n'
+expect b_opt 'Реклама в прошивке: отключено служб'
+expect b_opt 'Архив:'
+reject b_opt 'остановился'
+reject b_opt 'Exception'
+SD3="$WORK/sdcard3"; CP3="$WORK/copies3"; rm -rf "$SD3" "$CP3"
+python3 - "$SD3" <<'PY'
+import os, sys, shutil
+sd = sys.argv[1]; os.makedirs(os.path.join(sd, 'DCIM/Camera')); os.makedirs(os.path.join(sd, 'Bluetooth'))
+for i in range(1500): open(os.path.join(sd, 'DCIM/Camera/IMG_%05d.jpg' % i), 'wb').write(os.urandom(21000 + i * 7))
+for i in range(30): shutil.copy(os.path.join(sd, 'DCIM/Camera/IMG_%05d.jpg' % i), os.path.join(sd, 'Bluetooth/copy_%05d.jpg' % i))
+PY
+MOCK_SDCARD="$SD3" KIT_ARGS="-CopyTo $CP3" run b_mem samsung '4\nТест\n2 3\n\nда\n'
+expect b_mem 'лишних копий: 30 (групп: 30)'
+expect b_mem '«Камера: фото и видео»: скопировано и проверено 1500 файлов'
+expect b_mem '«Дубли фото и видео»: скопировано и проверено 30 файлов'
+reject b_mem 'остановился'
+n=$(find "$SD3" -type f | wc -l); [ "$n" -eq 0 ] && echo "PASS b_mem: на телефоне не осталось перенесённых файлов" || { echo "FAIL b_mem: на телефоне осталось $n файлов"; FAIL=1; }
+n=$(find "$CP3" -type f | wc -l); [ "$n" -eq 1530 ] && echo "PASS b_mem: на компьютере 1530 файлов" || { echo "FAIL b_mem: на компьютере $n файлов"; FAIL=1; }
+
+# 6ж. Антивирус удалил файл набора -> набор говорит об этом прямо
+KM="$WORK/kit-miss"; rm -rf "$KM"; mkdir -p "$KM/data/lang"; cp "$ROOT/phonekit.ps1" "$KM/"; cp "$ROOT"/data/*.tsv "$KM/data/"; cp "$ROOT"/data/lang/*.json "$KM/data/lang/"; rm "$KM/data/ads.tsv"
+printf 'q\n' | MOCK_BRAND=samsung MOCK_STATE="$WORK/miss.json" timeout 120 pwsh -NoProfile -File "$KM/phonekit.ps1" -AdbPath "$ADB" -Lang ru -NoUpdateCheck -NoPause -Console > "$WORK/k_miss.log" 2>&1
+expect k_miss 'Не хватает файлов набора: data/ads.tsv'
+expect k_miss 'Или скачайте набор заново: https://github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/releases/latest'
 
 # 7. Пункт U на подставных данных Windows
 if pwsh -NoProfile -File "$ROOT/tests/usbtest.ps1"; then echo "PASS usbtest"; else echo "FAIL usbtest"; FAIL=1; fi

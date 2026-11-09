@@ -36,6 +36,13 @@ def sd_shell(cmd):
         return ''
     if a[:2] == ['mkdir', '-p']:
         os.makedirs(lp(a[2]), exist_ok=True); return ''
+    if a[0] == 'md5sum':
+        import hashlib
+        out = []
+        for x in a[1:]:
+            if os.path.isfile(lp(x)): out.append('%s  %s' % (hashlib.md5(open(lp(x), 'rb').read()).hexdigest(), x))
+            else: out.append('md5sum: %s: No such file or directory' % x)
+        return '\n'.join(out)
     if a[:3] == ['df', '-k', '/data']:
         used = sum(kb(os.path.join(SD, d)) for d in os.listdir(SD))
         return 'Filesystem 1K-blocks Used Available Use%% Mounted on\n/dev/block/dm-5 30000000 %d %d 50%% /data' % (used, 30000000 - used)
@@ -89,6 +96,15 @@ third = {'com.whatsapp': 'com.android.vending', 'org.telegram.messenger': 'com.a
 launch = ['com.whatsapp', 'org.telegram.messenger', 'com.super.cleaner.booster', 'com.oldgame.idle', 'org.chromium.webapk.a550a015e23cabaf4_v2', 'com.booking',
   'com.google.android.youtube', 'com.google.android.gm', 'com.android.chrome', 'com.android.settings', 'com.android.vending', 'com.sec.android.app.sbrowser',
   'com.miui.player', 'com.mi.globalbrowser', 'com.xiaomi.mipicks', 'com.google.android.dialer', 'com.google.android.apps.messaging']
+# MOCK_BIG=N: «большой» телефон — N системных пакетов из базы UAD и N сторонних приложений
+BIG = int(os.environ.get('MOCK_BIG', '0') or 0)
+if BIG:
+    uadf = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'uad.tsv')
+    extra = [l.split('\t')[0] for l in open(uadf, encoding='utf-8').read().splitlines()[1:] if '\tRecommended\t' in l or '\tAdvanced\t' in l]
+    sysp = sysp + [x for x in extra[:BIG] if x not in sysp]
+    for i in range(BIG):
+        third['com.user.app%04d' % i] = 'com.android.vending'
+        if i % 2 == 0: launch.append('com.user.app%04d' % i)
 allp = sysp + list(third)
 
 def installed(): return [p for p in allp if p not in st['uninst']]
