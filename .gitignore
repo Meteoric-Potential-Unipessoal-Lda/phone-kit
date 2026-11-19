@@ -4,3 +4,5 @@ tools/
 reports/
 backups/
 tests/mockstate.json
+# Сборка phone-kit Mobile (mobile/build.sh)
+mobile/build/

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- phone-kit Mobile: чистка этого же телефона через его «Беспроводную отладку» (Android 11+), без компьютера -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="net.zherdyev.phonekit">
+  <!-- сеть — только чтобы подключиться к самому себе (127.0.0.1) и найти порт отладки по mDNS -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <!-- уведомление, в которое вводится код сопряжения -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <application
+      android:label="phone-kit"
+      android:icon="@mipmap/ic_launcher"
+      android:allowBackup="false"
+      android:theme="@android:style/Theme.Material.NoActionBar">
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:launchMode="singleTop"
+        android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density|locale|layoutDirection"
+        android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+    <receiver android:name=".PairReceiver" android:exported="false" />
+  </application>
+</manifest>

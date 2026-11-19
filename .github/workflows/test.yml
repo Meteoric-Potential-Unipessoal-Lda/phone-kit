@@ -47,3 +47,42 @@ jobs:
       - name: Кнопка «Обновить» (самообновление) в Windows PowerShell 5.1
         shell: pwsh
         run: python tests/updtest.py powershell
+
+  mobile:
+    name: phone-kit Mobile (бета) — тесты и сборка APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Логика, протокол ADB, сопряжение по коду, TLS
+        run: |
+          java -version
+          CV=2.5.2; J="$RUNNER_TEMP/conscrypt-openjdk-uber-$CV.jar"; U="https://repo1.maven.org/maven2/org/conscrypt/conscrypt-openjdk-uber/$CV/conscrypt-openjdk-uber-$CV.jar"
+          curl -fsSL -o "$J" "$U"; [ "$(curl -fsSL "$U.sha1" | cut -c1-40)" = "$(sha1sum "$J" | cut -c1-40)" ] || { echo "conscrypt sha1 mismatch"; exit 1; }
+          CONSCRYPT_JAR="$J" bash tests/mobile/run.sh
+      - name: Сборка APK
+        env:
+          KS_B64: ${{ secrets.PHONEKIT_KEYSTORE_B64 }}
+          PHONEKIT_KS_PASS: ${{ secrets.PHONEKIT_KS_PASS }}
+        run: |
+          if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.p12"; export PHONEKIT_KEYSTORE="$RUNNER_TEMP/ks.p12"; fi
+          bash mobile/build.sh "$PWD/out/phone-kit-mobile-0.1-beta.apk"
+          sha256sum out/phone-kit-mobile-0.1-beta.apk | tee out/sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phone-kit-mobile
+          path: out/phone-kit-mobile-0.1-beta.apk
+      - name: Черновик пре-релиза mobile-v0.1-beta (публикует владелец)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=mobile-v0.1-beta
+          D="$(gh release list --limit 100 --json tagName,isDraft -q ".[] | select(.tagName==\"$TAG\") | .isDraft")"
+          if [ "$D" = "false" ]; then echo "$TAG уже опубликован — не трогаю"; exit 0; fi
+          if [ "$D" = "true" ]; then gh release delete "$TAG" --yes; fi
+          SUM="$(cut -c1-64 out/sha256.txt)"
+          python3 mobile/release_notes.py "$SUM" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" out/phone-kit-mobile-0.1-beta.apk --draft --prerelease --target "$GITHUB_SHA" \
+            --title "phone-kit Mobile 0.1 beta — чистка телефона без компьютера (Android 11+)" --notes-file "$RUNNER_TEMP/notes.md"

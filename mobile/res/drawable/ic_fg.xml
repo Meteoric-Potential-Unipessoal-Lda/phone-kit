@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- значок: телефон с галочкой (чистка) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <path android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineJoin="round"
+      android:pathData="M42,30 L66,30 Q72,30 72,36 L72,72 Q72,78 66,78 L42,78 Q36,78 36,72 L36,36 Q36,30 42,30 Z" />
+  <path android:fillColor="#FFFFFF" android:pathData="M50,72 L58,72 L58,74 L50,74 Z" />
+  <path android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"
+      android:pathData="M45,54 L51,60 L63,47" />
+</vector>

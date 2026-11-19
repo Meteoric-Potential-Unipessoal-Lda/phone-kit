@@ -1,0 +1,74 @@
+key	ru	uk	en	pt	es	fr	it	de	lv	pl
+x000	phone-kit	phone-kit	phone-kit							
+x001	Чистка этого телефона без компьютера: приложение подключается к самому себе через «Беспроводную отладку» и делает то же, что phone-kit на ноутбуке — только безопасное, с проверкой после каждого шага и откатом.	Чищення цього телефона без комп'ютера: застосунок підключається сам до себе через «Бездротове налагодження» і робить те саме, що phone-kit на ноутбуці — лише безпечне, з перевіркою після кожного кроку та відкатом.	Clean up this phone without a computer: the app connects to itself over Wireless debugging and does what phone-kit does on a laptop — only safe changes, checked after every step, with rollback.							
+x002	Нужен Android 11 или новее, а здесь Android {0}. Почистить такой телефон можно phone-kit на компьютере: github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit	Потрібен Android 11 або новіший, а тут Android {0}. Почистити такий телефон можна phone-kit на комп'ютері: github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit	Android 11 or newer is required; this phone has Android {0}. Use phone-kit on a computer instead: github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit							
+x003	Бета-версия. Расскажите, как прошло на вашем телефоне: кнопка «Отправить отчёт» после проверки.	Бета-версія. Розкажіть, як пройшло на вашому телефоні: кнопка «Надіслати звіт» після перевірки.	Beta. Tell us how it went on your phone: use “Send report” after the check.							
+x010	Шаг 1. Сопряжение (один раз)	Крок 1. Сполучення (один раз)	Step 1. Pairing (once)							
+x011	1) Настройки → О телефоне → 7 раз нажмите «Номер сборки» (Xiaomi: «Версия MIUI / HyperOS») — появится раздел «Для разработчиков».\n2) Для разработчиков → включите «Беспроводная отладка» (телефон должен быть подключён к Wi-Fi).\n3) Нажмите на «Беспроводная отладка» → «Подключить устройство с помощью кода».\n4) Не закрывая окно с кодом, опустите шторку и введите 6 цифр в уведомление phone-kit.	1) Налаштування → Про телефон → 7 разів натисніть «Номер збірки» (Xiaomi: «Версія MIUI / HyperOS») — з'явиться розділ «Для розробників».\n2) Для розробників → увімкніть «Бездротове налагодження» (телефон має бути підключений до Wi-Fi).\n3) Натисніть «Бездротове налагодження» → «Підключити пристрій за допомогою коду».\n4) Не закриваючи вікно з кодом, опустіть шторку та введіть 6 цифр у сповіщення phone-kit.	1) Settings → About phone → tap “Build number” 7 times (Xiaomi: “MIUI / HyperOS version”) to unlock Developer options.\n2) Developer options → turn on “Wireless debugging” (the phone must be on Wi-Fi).\n3) Tap “Wireless debugging” → “Pair device with pairing code”.\n4) Keep the code window open, pull down the notification shade and type the 6 digits into the phone-kit notification.							
+x012	Показать уведомление для кода	Показати сповіщення для коду	Show the pairing notification							
+x013	Открыть «Для разработчиков»	Відкрити «Для розробників»	Open Developer options							
+x014	Сопряжено ✓	Сполучено ✓	Paired ✓							
+x015	Шаг 2. Подключиться и проверить телефон	Крок 2. Підключитися та перевірити телефон	Step 2. Connect and check the phone							
+x016	Экран разделён на два окна? Можно ввести код здесь:	Екран поділено на два вікна? Можна ввести код тут:	Using split screen? You can type the code here:							
+x017	6 цифр кода	6 цифр коду	6-digit code							
+x018	Сопрячь	Сполучити	Pair							
+x020	Сопряжение	Сполучення	Pairing							
+x021	phone-kit: код сопряжения	phone-kit: код сполучення	phone-kit: pairing code							
+x022	Откройте «Беспроводная отладка» → «Подключить устройство с помощью кода» и нажмите «Ввести код».	Відкрийте «Бездротове налагодження» → «Підключити пристрій за допомогою коду» та натисніть «Ввести код».	Open Wireless debugging → Pair device with pairing code, then tap “Enter code”.							
+x023	Ввести код	Ввести код	Enter code							
+x024	Сопрягаю…	Сполучаю…	Pairing…							
+x025	Сопряжено. Вернитесь в phone-kit и нажмите «Подключиться».	Сполучено. Поверніться в phone-kit і натисніть «Підключитися».	Paired. Go back to phone-kit and tap “Connect”.							
+x026	Неверный код или окно с кодом уже закрыто. Откройте его снова и введите новый код.	Невірний код або вікно з кодом уже закрите. Відкрийте його знову та введіть новий код.	Wrong code, or the code window is already closed. Open it again and enter the new code.							
+x027	Не нашёл окно сопряжения. Откройте «Подключить устройство с помощью кода» и вводите код, пока окно на экране.	Не знайшов вікно сполучення. Відкрийте «Підключити пристрій за допомогою коду» і вводьте код, поки вікно на екрані.	Pairing window not found. Open “Pair device with pairing code” and enter the code while that window is on screen.							
+x028	Ошибка сопряжения: {0}	Помилка сполучення: {0}	Pairing error: {0}							
+x029	Разрешите уведомления для phone-kit — в уведомление вводится код сопряжения.	Дозвольте сповіщення для phone-kit — у сповіщення вводиться код сполучення.	Allow notifications for phone-kit — the pairing code is typed into a notification.							
+x030	Подключаюсь к себе через беспроводную отладку…	Підключаюся до себе через бездротове налагодження…	Connecting to itself over Wireless debugging…							
+x031	Беспроводная отладка выключена или нет Wi-Fi. Включите её в «Для разработчиков» и повторите.	Бездротове налагодження вимкнене або немає Wi-Fi. Увімкніть його в «Для розробників» і повторіть.	Wireless debugging is off or there is no Wi-Fi. Turn it on in Developer options and try again.							
+x032	Приложение не сопряжено (или сопряжение сбросилось, например после «Отозвать авторизации»). Сделайте шаг 1.	Застосунок не сполучено (або сполучення скинулося, наприклад після «Відкликати авторизації»). Виконайте крок 1.	The app is not paired (or the pairing was reset, e.g. by “Revoke authorizations”). Do step 1.							
+x033	Подключено: {0}	Підключено: {0}	Connected: {0}							
+x034	Не удалось подключиться: {0}	Не вдалося підключитися: {0}	Could not connect: {0}							
+x035	Не загрузился модуль TLS (Conscrypt), без него беспроводная отладка не работает. Используйте phone-kit на компьютере и напишите нам модель телефона.	Не завантажився модуль TLS (Conscrypt), без нього бездротове налагодження не працює. Скористайтеся phone-kit на комп'ютері та напишіть нам модель телефона.	The TLS module (Conscrypt) failed to load; Wireless debugging cannot work without it. Use phone-kit on a computer and tell us the phone model.							
+x036	Проверяю телефон — только чтение, ничего не меняется…	Перевіряю телефон — лише читання, нічого не змінюється…	Checking the phone — read-only, nothing is changed…							
+x041	Android {0} (SDK {1}) · ОЗУ свободно {2} из {3} МБ · память: свободно {4} МБ	Android {0} (SDK {1}) · ОЗП вільно {2} з {3} МБ · пам'ять: вільно {4} МБ	Android {0} (SDK {1}) · RAM free {2} of {3} MB · storage free {4} MB							
+x042	Явных проблем не найдено.	Явних проблем не знайдено.	No obvious problems found.							
+x043	План чистки	План чищення	Cleanup plan							
+x044	Откатить изменения	Відкотити зміни	Roll back changes							
+x045	с {0}, изменений: {1}	з {0}, змін: {1}	since {0}, changes: {1}							
+x046	Отправить отчёт	Надіслати звіт	Send report							
+x047	Закрыть подключение	Закрити підключення	Disconnect							
+x048	Подключение закрыто. Беспроводную отладку можно выключить — для отката она понадобится снова.	Підключення закрито. Бездротове налагодження можна вимкнути — для відкату воно знадобиться знову.	Disconnected. You can turn Wireless debugging off — you will need it again to roll back.							
+x050	Применить отмеченное ({0})	Застосувати позначене ({0})	Apply selected ({0})							
+x051	Снять все галочки	Зняти всі позначки	Uncheck all							
+x052	Применить пунктов: {0}? Всё, кроме очистки кэша, можно вернуть кнопкой «Откатить изменения».	Застосувати пунктів: {0}? Усе, крім очищення кешу, можна повернути кнопкою «Відкотити зміни».	Apply {0} items? Everything except clearing the cache can be undone with “Roll back changes”.							
+x053	Применить	Застосувати	Apply							
+x054	Отмена	Скасувати	Cancel							
+x055	Ничего не отмечено	Нічого не позначено	Nothing selected							
+x056	Чистить нечего — телефон в порядке.	Чистити нічого — телефон у порядку.	Nothing to clean — the phone is fine.							
+x057	Назад	Назад	Back							
+x058	Отмечено то, что набор считает явным мусором. Остальное — только если владелец этим не пользуется.	Позначено те, що набір вважає явним сміттям. Решта — лише якщо власник цим не користується.	Pre-checked items are what the kit considers clear junk. Check the rest only if the owner does not use it.							
+x060	Не выключайте экран и не переключайтесь на другие приложения до конца.	Не вимикайте екран і не перемикайтеся на інші застосунки до кінця.	Keep the screen on and stay in the app until it finishes.							
+x061	Готово. Перезагрузите телефон, чтобы освободилась память. Если что-то перестало работать — «Откатить изменения».	Готово. Перезавантажте телефон, щоб звільнилася пам'ять. Якщо щось перестало працювати — «Відкотити зміни».	Done. Restart the phone to free up memory. If something stopped working, use “Roll back changes”.							
+x062	Откат выполнен.	Відкат виконано.	Rollback done.							
+x063	Журнал изменений хранится внутри приложения. Если захотите удалить phone-kit — сначала нажмите «Откатить изменения».	Журнал змін зберігається всередині застосунку. Якщо захочете видалити phone-kit — спершу натисніть «Відкотити зміни».	The change journal is stored inside the app. If you want to uninstall phone-kit, roll back first.							
+x064	Журнал пуст — откатывать нечего.	Журнал порожній — відкочувати нічого.	The journal is empty — nothing to roll back.							
+x065	После изменений обновилась прошивка ({0}) — откат всё равно попробуем.	Після змін оновилася прошивка ({0}) — відкат однаково спробуємо.	The firmware was updated after the changes ({0}) — we will still try to roll back.							
+x066	Вернуть отмеченное ({0})	Повернути позначене ({0})	Undo selected ({0})							
+x067	Вернуть изменений: {0}?	Повернути змін: {0}?	Undo {0} changes?							
+x068	Связь потеряна: {0}. Журнал сохранён — подключитесь снова, откат будет доступен.	Зв'язок втрачено: {0}. Журнал збережено — підключіться знову, відкат буде доступний.	Connection lost: {0}. The journal is saved — reconnect and rollback will be available.							
+x069	Готово	Готово	Done							
+x070	Язык	Мова	Language							
+x071	Ключ приложения: {0}	Ключ застосунку: {0}	App key: {0}							
+x072	Как это работает и безопасно ли	Як це працює і чи безпечно	How it works and is it safe							
+x073	Android 11+ умеет «Беспроводную отладку» — то же, что USB-отладка, только по Wi-Fi. Приложение сопрягается с ней как компьютер и получает те же права, что adb: отключать встроенные приложения, менять несколько настроек, ограничивать фон.	Android 11+ має «Бездротове налагодження» — те саме, що USB-налагодження, тільки через Wi-Fi. Застосунок сполучається з ним як комп'ютер і отримує ті самі права, що adb: вимикати вбудовані застосунки, змінювати кілька налаштувань, обмежувати фон.	Android 11+ has Wireless debugging — the same as USB debugging, but over Wi-Fi. The app pairs with it like a computer and gets the same rights as adb: disable built-in apps, change a few settings, restrict background work.							
+x074	Работают те же правила, что у phone-kit на ноутбуке: белый список команд, защита системных, телефонных и банковских пакетов, ничего из того, чем пользовались. Пакеты отключаются партиями по 5; после каждой проверяются рабочий стол, Настройки, клавиатура и системный интерфейс — при проблеме партия сразу возвращается.	Діють ті самі правила, що в phone-kit на ноутбуці: білий список команд, захист системних, телефонних і банківських пакетів, нічого з того, чим користувалися. Пакети вимикаються партіями по 5; після кожної перевіряються робочий стіл, Налаштування, клавіатура та системний інтерфейс — у разі проблеми партія одразу повертається.	The same rules as phone-kit on a laptop apply: a whitelist of commands, protection for system, phone and banking packages, nothing that has been used. Packages are disabled in batches of 5; after each batch the home screen, Settings, keyboard and system UI are checked, and a batch is undone at once if something breaks.							
+x075	Ничего не удаляется насовсем: отключённое возвращается кнопкой «Откатить изменения» (или вручную в Настройках → Приложения). Файлы, фото и переписки приложение не читает и не отправляет; интернет ему нужен только для связи с самим собой.	Нічого не видаляється назавжди: вимкнене повертається кнопкою «Відкотити зміни» (або вручну в Налаштуваннях → Застосунки). Файли, фото й листування застосунок не читає і не надсилає; інтернет йому потрібен лише для зв'язку із самим собою.	Nothing is removed for good: disabled apps come back with “Roll back changes” (or manually in Settings → Apps). The app does not read or send files, photos or chats; it needs network access only to talk to itself.							
+x076	Беспроводная отладка выключается сама при смене Wi-Fi или перезагрузке — это нормально. После чистки её можно выключить.	Бездротове налагодження вимикається саме при зміні Wi-Fi або перезавантаженні — це нормально. Після чищення його можна вимкнути.	Wireless debugging turns itself off when Wi-Fi changes or after a restart — that is normal. You can turn it off after the cleanup.							
+x150	phone-kit Mobile {0} — отчёт	phone-kit Mobile {0} — звіт	phone-kit Mobile {0} — report							
+x151	Наблюдения:	Спостереження:	Observations:							
+x152	Что сделано:	Що зроблено:	What was done:							
+x153	ОЗУ свободно: {0} → {1} МБ · процессов: {2} → {3} · отключено пакетов: {4} → {5}	ОЗП вільно: {0} → {1} МБ · процесів: {2} → {3} · вимкнено пакетів: {4} → {5}	Free RAM: {0} → {1} MB · processes: {2} → {3} · disabled packages: {4} → {5}							
+x154	В журнале изменений: {0} (откат — в приложении):	У журналі змін: {0} (відкат — у застосунку):	Changes in the journal: {0} (roll back in the app):							
+x160	Бета · отзывы и ошибки: github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/issues	Бета · відгуки та помилки: github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/issues	Beta · feedback and bugs: github.com/Meteoric-Potential-Unipessoal-Lda/phone-kit/issues							
+x037	свойства телефона	властивості телефона	phone properties							
+x080	Реклама и сбор данных в прошивке: работает служб — {0}. Их можно отключить в плане (раздел «Реклама и сбор данных в прошивке»).	Реклама та збір даних у прошивці: працює служб — {0}. Їх можна вимкнути в плані (розділ «Реклама та збір даних у прошивці»).	Ads and data collection in the firmware: {0} services running. You can disable them in the plan (“Ads and data collection” section).							
+x081	Подозрительные приложения: {0} — см. раздел «Безопасность» в плане.	Підозрілі застосунки: {0} — див. розділ «Безпека» в плані.	Suspicious apps: {0} — see the “Security” section of the plan.							

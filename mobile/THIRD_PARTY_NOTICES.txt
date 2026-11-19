@@ -1,0 +1,13 @@
+car-kit Mobile (GPL-3.0) includes:
+
+Conscrypt — https://github.com/google/conscrypt
+  Copyright The Android Open Source Project. Licensed under the Apache License, Version 2.0:
+  https://www.apache.org/licenses/LICENSE-2.0
+  Conscrypt includes BoringSSL — https://boringssl.googlesource.com/boringssl
+  (OpenSSL / SSLeay / ISC licenses, see https://boringssl.googlesource.com/boringssl/+/HEAD/LICENSE).
+
+SPAKE2 points M and N and the protocol details follow BoringSSL crypto/curve25519/spake25519.cc
+(Apache License 2.0) and the Android Open Source Project adb pairing code (Apache License 2.0);
+the Java implementation is car-kit's own.
+
+Package base data/uad.tsv — Universal Android Debloater Next Generation (GPL-3.0).
