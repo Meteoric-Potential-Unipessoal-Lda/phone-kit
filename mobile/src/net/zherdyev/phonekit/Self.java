@@ -95,6 +95,15 @@ final class Self {
     throw last != null ? last : new NoService(PAIR);
   }
 
+  /** Подключение по порту, который человек ввёл сам (строка «IP-адрес и порт» на экране «Беспроводная отладка») — если mDNS не находит службу. */
+  static AdbConn connectPort(Context c, int port) throws Exception {
+    Tls t = tls();
+    if (t == null) throw new IOException("TLS");
+    AdbConn a = AdbConn.connect(HOST, port, key(c), 10, null, t);
+    prefs(c).edit().putInt("port", port).apply();
+    return a;
+  }
+
   /** Подключение к своему adbd по TLS. */
   static AdbConn connect(Context c) throws Exception {
     Tls t = tls();

@@ -161,7 +161,29 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     page.addView(row, lp(-1, -2, 4));
 
     space(8);
-    button(L.t("x015"), paired, new View.OnClickListener() { public void onClick(View v) { connect(); } });
+    button(L.t("x015"), paired, new View.OnClickListener() { public void onClick(View v) { connect(0); } });
+    if (portHint) {
+      // mDNS не нашёл службу подключения (бывает на Xiaomi/HyperOS) — порт можно ввести вручную
+      text(L.t("x082"), MUTED, 13);
+      LinearLayout prow = new LinearLayout(this);
+      prow.setGravity(Gravity.CENTER_VERTICAL);
+      final EditText port = new EditText(this);
+      port.setHint(L.t("x083"));
+      port.setTextColor(TXT);
+      port.setHintTextColor(MUTED);
+      port.setSingleLine(true);
+      port.setInputType(InputType.TYPE_CLASS_NUMBER);
+      prow.addView(port, new LinearLayout.LayoutParams(0, -2, 1));
+      Button cb = mkButton(L.t("x084"), false);
+      cb.setOnClickListener(new View.OnClickListener() { public void onClick(View v) {
+        String s = port.getText().toString().replaceAll("^.*:", "").trim();
+        int p = 0;
+        try { p = Integer.parseInt(s); } catch (NumberFormatException ignored) {}
+        if (p > 0 && p < 65536) connect(p); else toastMsg(L.t("x083"));
+      } });
+      prow.addView(cb, new LinearLayout.LayoutParams(-2, -2));
+      page.addView(prow, lp(-1, -2, 4));
+    }
     button(L.t("x072"), false, new View.OnClickListener() { public void onClick(View v) { showHelp(); } });
     space(12);
     langPicker();
@@ -262,7 +284,9 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
 
   // ---------------------------------------------------------------- подключение и диагностика
 
-  void connect() {
+  boolean portHint;
+
+  void connect(final int manualPort) {
     if (busy) return;
     busy = true;
     clear();
@@ -276,12 +300,14 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
           if (conn != null) conn.close();
           conn = null;
           if (Self.tls() == null) { fail(L.t("x035")); return; }
-          conn = Self.connect(MainActivity.this);
+          conn = manualPort > 0 ? Self.connectPort(MainActivity.this, manualPort) : Self.connect(MainActivity.this);
+          portHint = false;
           postMsg(L.t("x033", conn.banner.length() > 60 ? conn.banner.substring(0, 60) : conn.banner), OKC);
           diagnose();
         } catch (AdbConn.NotPaired e) { prefs.edit().putBoolean("paired", false).apply(); fail(L.t("x032"));
-        } catch (Self.NoService e) { fail(L.t("x031"));
-        } catch (java.net.ConnectException e) { fail(L.t("x031"));
+        } catch (Self.NoService e) { portHint = true; fail(L.t("x031"));
+        } catch (java.net.ConnectException e) { portHint = true; fail(L.t("x031"));
+        } catch (java.net.SocketTimeoutException e) { portHint = true; fail(L.t("x031"));
         } catch (Throwable e) { android.util.Log.w("PHONEKIT", "connect: " + e, e); fail(L.t("x034", String.valueOf(e.getMessage() == null ? e.toString() : e.getMessage()))); }
       }
     }).start();

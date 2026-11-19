@@ -66,6 +66,9 @@ x075	Ничего не удаляется насовсем: отключённо
 x076	Беспроводная отладка выключается сама при смене Wi-Fi или перезагрузке — это нормально. После чистки её можно выключить.	Бездротове налагодження вимикається саме при зміні Wi-Fi або перезавантаженні — це нормально. Після чищення його можна вимкнути.	Wireless debugging turns itself off when Wi-Fi changes or after a restart — that is normal. You can turn it off after the cleanup.							
 x077	Скопировать отчёт	Скопіювати звіт	Copy report							
 x078	Отчёт скопирован — вставьте его в Telegram или почту.	Звіт скопійовано — вставте його в Telegram або пошту.	Report copied — paste it into Telegram or email.							
+x082	Сопряжено, но не подключается? Откройте «Беспроводная отладка» — там строка «IP-адрес и порт», например 192.168.1.5:41234. Введите число после двоеточия (Wi-Fi и «Беспроводная отладка» должны быть включены):	Сполучено, але не підключається? Відкрийте «Бездротове налагодження» — там рядок «IP-адреса і порт», наприклад 192.168.1.5:41234. Введіть число після двокрапки (Wi-Fi і «Бездротове налагодження» мають бути увімкнені):	Paired but not connecting? Open “Wireless debugging” — it shows “IP address & Port”, e.g. 192.168.1.5:41234. Enter the number after the colon (Wi-Fi and Wireless debugging must be on):							
+x083	Порт, например 41234	Порт, наприклад 41234	Port, e.g. 41234							
+x084	Подключиться	Підключитися	Connect							
 x150	phone-kit Mobile {0} — отчёт	phone-kit Mobile {0} — звіт	phone-kit Mobile {0} — report							
 x151	Наблюдения:	Спостереження:	Observations:							
 x152	Что сделано:	Що зроблено:	What was done:							
