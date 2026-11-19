@@ -141,6 +141,8 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     TextView h = cardText(c, L.t("x010") + (paired ? "   " + L.t("x014") : ""), paired ? OKC : TXT);
     h.setTypeface(Typeface.DEFAULT_BOLD);
     cardText(c, L.t("x011"), MUTED);
+    TextView warn = cardText(c, L.t("x019"), WARN);
+    warn.setTypeface(Typeface.DEFAULT_BOLD);
     button(L.t("x013"), false, new View.OnClickListener() { public void onClick(View v) { openDevSettings(); } });
     button(L.t("x012"), !paired, new View.OnClickListener() { public void onClick(View v) { showPairNotification(); } });
     text(L.t("x016"), MUTED, 13);

@@ -12,9 +12,10 @@ x015	Шаг 2. Подключиться и проверить телефон	К�
 x016	Экран разделён на два окна? Можно ввести код здесь:	Екран поділено на два вікна? Можна ввести код тут:	Using split screen? You can type the code here:							
 x017	6 цифр кода	6 цифр коду	6-digit code							
 x018	Сопрячь	Сполучити	Pair							
+x019	⚠️ Главное: окно с 6 цифрами нельзя закрывать и сворачивать — код сразу сбросится. Вводите код, не уходя из этого окна: потяните шторку вниз и впишите цифры в уведомление phone-kit (или в поле ниже, если экран разделён на два окна).	⚠️ Головне: вікно з 6 цифрами не можна закривати й згортати — код одразу скинеться. Вводьте код, не виходячи з цього вікна: потягніть шторку вниз і впишіть цифри в сповіщення phone-kit (або в поле нижче, якщо екран поділено на два вікна).	⚠️ Important: do not close or minimise the window with the 6 digits — the code resets at once. Enter the code without leaving that window: pull down the notification shade and type the digits into the phone-kit notification (or into the field below in split screen).							
 x020	Сопряжение	Сполучення	Pairing							
 x021	phone-kit: код сопряжения	phone-kit: код сполучення	phone-kit: pairing code							
-x022	Откройте «Беспроводная отладка» → «Подключить устройство с помощью кода» и нажмите «Ввести код».	Відкрийте «Бездротове налагодження» → «Підключити пристрій за допомогою коду» та натисніть «Ввести код».	Open Wireless debugging → Pair device with pairing code, then tap “Enter code”.							
+x022	Не закрывайте окно с кодом! Нажмите «Ввести код» здесь, в шторке, и впишите 6 цифр.	Не закривайте вікно з кодом! Натисніть «Ввести код» тут, у шторці, і впишіть 6 цифр.	Keep the code window open! Tap “Enter code” here in the shade and type the 6 digits.							
 x023	Ввести код	Ввести код	Enter code							
 x024	Сопрягаю…	Сполучаю…	Pairing…							
 x025	Сопряжено. Вернитесь в phone-kit и нажмите «Подключиться».	Сполучено. Поверніться в phone-kit і натисніть «Підключитися».	Paired. Go back to phone-kit and tap “Connect”.							
