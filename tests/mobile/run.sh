@@ -70,6 +70,7 @@ reject m_sam 'third ru.vk.store'
 reject m_sam 'third com.samsung.android.app.homestar'
 reject m_sam 'third com.monotype.android.font.oppobigsans'
 reject m_sam 'third com.android.samsung.utilityagent'
+reject m_sam 'third com.google.android.safetycore'
 reject m_sam 'third com.housecleaning.asmr.makeover.home'
 expect m_sam 'Установлены не из магазина и имеют особые доступы: com.hidden.spy.svc, com.super.cleaner.booster —'
 clean m_sam

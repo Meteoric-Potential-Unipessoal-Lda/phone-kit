@@ -1197,7 +1197,7 @@ $PreloadInstallers = 'preload|preinstall|^android$|omcagent|carrier|^com\.(samsu
 # Известные приложения, которые часто ставят файлом (банки, госуслуги, VPN, свои): не «подозрительные», если нет спецвозможностей/администратора
 # Игры со словом clean в названии (ASMR-уборка, makeover) — не чистильщики
 $NotCleaner = 'asmr|game|makeover|tycoon|simulator|idle|speaker|water'
-$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor|transsion)\.|^com\.android\.samsung\.|^com\.monotype\.android\.font\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|cleanzer|cleanyour|tvvoicesearch|zherdyev|telegram|^com\.aefyr\.sai'
+$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor|transsion)\.|^com\.android\.samsung\.|^com\.monotype\.android\.font\.|^com\.google\.android\.(safetycore|contactkeys)$|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|cleanzer|cleanyour|tvvoicesearch|zherdyev|telegram|^com\.aefyr\.sai'
 
 # ----------------------------------------------------------------- изменения: оптимизация и откат
 
