@@ -1254,6 +1254,13 @@ function ShW([string]$cmd, [int]$TimeoutSec = 120) {
   Log-Change ("> $cmd`r`n           $out")
   return $out
 }
+# Короткий ответ телефона для журнала: без стека Java ("at ..."), не больше 2 строк и 200 символов (HyperOS отвечает простынёй)
+function Short-Out([string]$o) {
+  $l = @(($o -split "`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^at ' -and $_ -notmatch '^Exception occurred while executing' })
+  $t = ($l | Select-Object -First 2) -join ' '
+  if ($t.Length -gt 200) { $t = $t.Substring(0, 200) + '…' }
+  return $t
+}
 function OptLog([string]$t, [string]$kind = 'info') {
   [void]$script:OptLines.Add($t)
   switch ($kind) { 'ok' { Ok $t } 'warn' { Warn $t } 'bad' { Bad $t } default { Say ('  ' + $t) } }
@@ -1320,7 +1327,7 @@ function Disable-Pkg([string]$pkg, [switch]$Third) {
   if ($listed -or $said) { Add-Journal @{ t = 'disable'; pkg = $pkg } }
   if ($listed) { OptLog (L 'm127' $pkg) 'ok'; return $true }
   if ($said) { OptLog (L 'm128' ${pkg}) 'warn'; return $true }
-  if ($Third) { OptLog (L 'm129' $pkg $out) 'warn'; return $false }
+  if ($Third) { OptLog (L 'm129' $pkg (Short-Out $out)) 'warn'; return $false }
   # Прошивка не дала отключить (бывает на Xiaomi/Samsung) — удаляем только для пользователя 0, с сохранением; откат: install-existing
   $out2 = ShW "pm uninstall -k --user 0 $pkg"
   $gone = -not (Get-InstalledSet).Contains($pkg)
@@ -1329,18 +1336,18 @@ function Disable-Pkg([string]$pkg, [switch]$Third) {
     if ($gone) { OptLog (L 'm130' $pkg) 'ok'; return $true }
     OptLog (L 'm131' ${pkg}) 'warn'; return $true
   }
-  OptLog (L 'm132' $pkg $out $out2) 'warn'; return $false
+  OptLog (L 'm132' $pkg (Short-Out $out) (Short-Out $out2)) 'warn'; return $false
 }
 function Enable-Pkg([string]$pkg) {
   $out = ShW "pm enable --user 0 $pkg"
   if (-not (Get-DisabledSet).Contains($pkg)) { OptLog (L 'm133' $pkg) 'ok'; return $true }
-  OptLog (L 'm134' $pkg $out) 'bad'; return $false
+  OptLog (L 'm134' $pkg (Short-Out $out)) 'bad'; return $false
 }
 function Restore-Pkg([string]$pkg) {
   $out = ShW "cmd package install-existing --user 0 $pkg"
   if (-not (Get-InstalledSet).Contains($pkg)) { $out += ' / ' + (ShW "pm install-existing --user 0 $pkg") }
   if ((Get-InstalledSet).Contains($pkg)) { OptLog (L 'm135' $pkg) 'ok'; return $true }
-  OptLog (L 'm136' $pkg $out) 'bad'; return $false
+  OptLog (L 'm136' $pkg (Short-Out $out)) 'bad'; return $false
 }
 function Set-GlobalSetting([string]$key, [string]$val) {
   $old = (Sh "settings get global $key").Trim()

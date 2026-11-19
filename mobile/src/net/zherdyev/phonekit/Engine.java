@@ -661,6 +661,21 @@ public final class Engine {
 
   static boolean homeBad(String c) { return c.length() == 0 || c.startsWith("android/") || c.contains("FallbackHome") || c.contains("ResolverActivity"); }
 
+  /** Короткий ответ телефона: без стека Java ("at ..."), не больше 2 строк и 200 символов (HyperOS отвечает простынёй). */
+  static String brief(String o) {
+    StringBuilder sb = new StringBuilder();
+    int n = 0;
+    for (String l : o.split("\n")) {
+      String t = l.trim();
+      if (t.length() == 0 || t.startsWith("at ") || t.startsWith("Exception occurred while executing")) continue;
+      if (sb.length() > 0) sb.append(' ');
+      sb.append(t);
+      if (++n >= 2) break;
+    }
+    String r = sb.toString();
+    return r.length() > 200 ? r.substring(0, 200) + "…" : r;
+  }
+
   static String join(List<String> l, String sep) {
     StringBuilder sb = new StringBuilder();
     for (String x : l) { if (sb.length() > 0) sb.append(sep); sb.append(x); }
@@ -717,7 +732,7 @@ public final class Engine {
     if (listed || said) journal(e("disable", pkg));
     if (listed) { say(L.t("m127", pkg), OK); return true; }
     if (said) { say(L.t("m128", pkg), WARN); return true; }
-    if (thirdParty) { say(L.t("m129", pkg, out), WARN); return false; }
+    if (thirdParty) { say(L.t("m129", pkg, brief(out)), WARN); return false; }
     String out2 = W("pm uninstall -k --user 0 " + pkg);
     boolean gone = !pkgList(S("pm list packages")).contains(pkg);
     if (out2.contains("Success") || gone) {
@@ -725,7 +740,7 @@ public final class Engine {
       if (gone) { say(L.t("m130", pkg), OK); return true; }
       say(L.t("m131", pkg), WARN); return true;
     }
-    say(L.t("m132", pkg, out, out2), WARN);
+    say(L.t("m132", pkg, brief(out), brief(out2)), WARN);
     return false;
   }
 
@@ -833,11 +848,11 @@ public final class Engine {
   void undoEntry(Entry x) throws IOException {
     if (x.t.equals("disable")) {
       String out = W("pm enable --user 0 " + x.pkg);
-      if (!pkgList(S("pm list packages -d")).contains(x.pkg)) say(L.t("m133", x.pkg), OK); else say(L.t("m134", x.pkg, out), BAD);
+      if (!pkgList(S("pm list packages -d")).contains(x.pkg)) say(L.t("m133", x.pkg), OK); else say(L.t("m134", x.pkg, brief(out)), BAD);
     } else if (x.t.equals("uninstall")) {
       String out = W("cmd package install-existing --user 0 " + x.pkg);
       if (!pkgList(S("pm list packages")).contains(x.pkg)) out += " / " + W("pm install-existing --user 0 " + x.pkg);
-      if (pkgList(S("pm list packages")).contains(x.pkg)) say(L.t("m135", x.pkg), OK); else say(L.t("m136", x.pkg, out), BAD);
+      if (pkgList(S("pm list packages")).contains(x.pkg)) say(L.t("m135", x.pkg), OK); else say(L.t("m136", x.pkg, brief(out)), BAD);
     } else if (x.t.equals("setting")) {
       if (x.old.length() == 0 || x.old.equals("null")) W("settings delete global " + x.key); else W("settings put global " + x.key + " " + x.old);
       say(L.t("m147", x.key, x.old.length() > 0 && !x.old.equals("null") ? x.old : L.t("m146")), OK);
