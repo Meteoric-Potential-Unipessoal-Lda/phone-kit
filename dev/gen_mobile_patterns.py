@@ -65,7 +65,7 @@ def jstr(s):
     return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 scalar('SettingKeys')
-names = ['AskPattern', 'AutoPattern', 'KeepBgPattern', 'CleanerPattern', 'StoreInstallers', 'FileInstallers']
+names = ['AskPattern', 'AutoPattern', 'KeepBgPattern', 'CleanerPattern', 'StoreInstallers', 'FileInstallers', 'PreloadInstallers', 'KnownSideload', 'NotCleaner']
 vals = {n: scalar(n) for n in names}
 prot = array('ProtectedPatterns')
 write = array('WritePatterns')

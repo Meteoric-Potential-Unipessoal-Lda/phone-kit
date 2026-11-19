@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * с проверкой рабочего стола / Настроек / клавиатуры / SystemUI и откат по журналу. Без android.* — тестируется на обычной Java (tests/mobile).
  */
 public final class Engine {
-  public static final String VERSION = "0.1-beta";
+  public static final String VERSION = "0.2-beta";
   /** Само приложение: никогда не отключаем и не ограничиваем — иначе оборвём себе связь. */
   public static final String SELF = "net.zherdyev.phonekit";
   public static final int INFO = 0, OK = 1, WARN = 2, BAD = 3;
@@ -424,12 +424,13 @@ public final class Engine {
     roleSet = new HashSet<String>();
     for (List<String> hs : roles.values()) roleSet.addAll(hs);
     for (String x : new String[] { homePkg, imePkg }) if (x.length() > 0 && !x.equals("null")) roleSet.add(x);
-    keepSet = new HashSet<String>(roleSet);
     roleSet.add(SELF);
     keepSet = new HashSet<String>(roleSet);
     keepSet.addAll(a11yPkgs); keepSet.addAll(nlsPkgs); keepSet.addAll(adminPkgs);
-    boolean kids = all.contains("com.google.android.apps.kids.familylinkhelper") || roles.containsKey("android.app.role.SYSTEM_SUPERVISION")
-      || Pattern.compile("(?i)supervision|kids").matcher(dpTxt).find() || all.contains("com.sec.android.app.kidshome");
+    // детское устройство — только по признакам использования (Samsung Kids и роль SYSTEM_SUPERVISION есть почти везде)
+    boolean kids = usedPkgs.contains("com.sec.android.app.kidshome") || usedPkgs.contains("com.google.android.apps.kids.familylinkhelper")
+      || usedPkgs.contains("com.coloros.childrenspace");
+    for (String a : adminPkgs) if (Pattern.compile("(?i)supervision|familylink").matcher(a).find()) kids = true;
     boolean launchOk = launchable.size() >= 5;
 
     // --- кандидаты: включённые системные пакеты из базы
@@ -490,7 +491,9 @@ public final class Engine {
       boolean side = false;
       String inst = installer.containsKey(pkg) ? installer.get(pkg) : "";
       boolean noInst = inst.length() == 0 || inst.equals("null");
-      boolean preinst = inst.equals("android") || (noInst && d.uad.containsKey(pkg));
+      boolean preinst = inst.equals("android") || (Pat.PreloadInstallers.matcher(inst).find() && !Pat.FileInstallers.matcher(inst).find()) || (noInst && d.uad.containsKey(pkg));
+      boolean nameKnown = Pat.KnownSideload.matcher(pkg).find() || Pat.StoreInstallers.matcher(pkg).find();   // сами магазины (RuStore, F-Droid)
+      boolean known = nameKnown || usedPkgs.contains(pkg);   // банк/госуслуги/VPN или им пользуются — владелец его знает
       if (a11yPkgs.contains(pkg)) strong.add(L.t("m310"));
       if (adminPkgs.contains(pkg)) strong.add(L.t("m311"));
       boolean webapk = pkg.startsWith("org.chromium.webapk.");
@@ -504,11 +507,12 @@ public final class Engine {
       if (nlsPkgs.contains(pkg)) weak.add(L.t("m316"));
       if (overlayPkgs.contains(pkg)) weak.add(L.t("m317"));
       if (installPkgs.contains(pkg)) weak.add(L.t("m318"));
-      boolean cleaner = Pat.CleanerPattern.matcher(pkg).find();
+      boolean cleaner = Pat.CleanerPattern.matcher(pkg).find() && !Pat.NotCleaner.matcher(pkg).find() && !nameKnown;
       if (cleaner) strong.add(L.t("m319"));
       String lvl = "";
       if (strong.size() >= 2 || (side && weak.size() >= 1) || cleaner) lvl = "warn";
       else if (strong.size() >= 1 || (weak.size() >= 2 && !store)) lvl = "check";
+      if (lvl.equals("warn") && known && !cleaner && !a11yPkgs.contains(pkg) && !adminPkgs.contains(pkg)) lvl = "check";
       if (webapk) { lvl = "check"; weak.add(L.t("m320")); }
       if (lvl.length() > 0) {
         Susp s = new Susp(); s.pkg = pkg; s.level = lvl;

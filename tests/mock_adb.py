@@ -92,7 +92,9 @@ else:
     ime = 'com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME'
 third = {'com.whatsapp': 'com.android.vending', 'org.telegram.messenger': 'com.android.vending', 'com.super.cleaner.booster': 'com.google.android.packageinstaller',
   'com.hidden.spy.svc': 'com.android.packageinstaller', 'com.oldgame.idle': 'com.android.vending', 'org.chromium.webapk.a550a015e23cabaf4_v2': 'com.android.chrome',
-  'com.booking': 'null'}
+  'com.booking': 'null', 'ru.sberbankmobile': 'com.google.android.packageinstaller', 'com.housecleaning.asmr.makeover.home': 'com.android.vending', 'ru.vk.store': 'com.google.android.packageinstaller'}
+# Samsung Kids: предустановлен почти на всех Galaxy (ставит preloadinstaller) — не «подозрительный» и не признак детского телефона
+if brand == 'samsung': third.update({'com.sec.android.app.kidshome': 'com.sec.android.preloadinstaller', 'com.samsung.android.app.homestar': 'com.samsung.android.goodlock'})
 launch = ['com.whatsapp', 'org.telegram.messenger', 'com.super.cleaner.booster', 'com.oldgame.idle', 'org.chromium.webapk.a550a015e23cabaf4_v2', 'com.booking',
   'com.google.android.youtube', 'com.google.android.gm', 'com.android.chrome', 'com.android.settings', 'com.android.vending', 'com.sec.android.app.sbrowser',
   'com.miui.player', 'com.mi.globalbrowser', 'com.xiaomi.mipicks', 'com.google.android.dialer', 'com.google.android.apps.messaging']
@@ -178,11 +180,12 @@ def shell(cmd):
           '    package=com.miui.home totalTimeUsed="2:01:02" lastTimeUsed="2026-10-27 10:00:00"\n'
           '    package=com.sec.android.app.launcher totalTimeUsed="2:01:02" lastTimeUsed="2026-10-27 10:00:00"\n'
           '    package=com.oldgame.idle totalTimeUsed="00:00:30" lastTimeUsed="2026-05-01 10:00:00"\n'
-          '    package=com.android.settings totalTimeUsed="00:10:00" lastTimeUsed="2026-10-27 10:00:00"\n')
+          '    package=com.android.settings totalTimeUsed="00:10:00" lastTimeUsed="2026-10-27 10:00:00"\n'
+          + ('    package=com.sec.android.app.kidshome totalTimeUsed="5:00:00" lastTimeUsed="2026-10-27 10:00:00"\n' if os.environ.get('MOCK_KIDS') else ''))
     if cmd == 'dumpsys device_policy': return 'Enabled Device Admins (User 0, provisioningState: 3):\n  com.hidden.spy.svc/.Adm:\n    ComponentInfo{com.hidden.spy.svc/com.hidden.spy.svc.Adm}\n'
     if cmd.startswith('cmd appops query-op'):
-        if 'SYSTEM_ALERT_WINDOW' in cmd: return 'com.hidden.spy.svc\ncom.whatsapp'
-        return 'com.super.cleaner.booster'
+        if 'SYSTEM_ALERT_WINDOW' in cmd: return 'com.hidden.spy.svc\ncom.whatsapp\nru.sberbankmobile\ncom.sec.android.app.kidshome'
+        return 'com.super.cleaner.booster\nru.vk.store'
     if a[:2] == ['cmd', 'appops'] and a[2] == 'get':
         m = st['appops'].get(a[3]); return ('RUN_ANY_IN_BACKGROUND: %s' % m) if m else 'No operations.'
     if a[:2] == ['cmd', 'appops'] and a[2] == 'set': st['appops'][a[3]] = a[5]; save(); return ''

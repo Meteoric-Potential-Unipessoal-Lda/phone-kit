@@ -67,25 +67,27 @@ jobs:
           PHONEKIT_KS_PASS: ${{ secrets.PHONEKIT_KS_PASS }}
         run: |
           if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.p12"; export PHONEKIT_KEYSTORE="$RUNNER_TEMP/ks.p12"; fi
-          bash mobile/build.sh "$PWD/out/phone-kit-mobile-0.1-beta.apk"
-          sha256sum out/phone-kit-mobile-0.1-beta.apk | tee out/sha256.txt
+          VER="$(sed -n 's/.*String VERSION = "\([^"]*\)".*/\1/p' mobile/src/net/zherdyev/phonekit/Engine.java)"
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          bash mobile/build.sh "$PWD/out/phone-kit-mobile-$VER.apk"
+          sha256sum "out/phone-kit-mobile-$VER.apk" | tee out/sha256.txt
       - uses: actions/upload-artifact@v4
         with:
           name: phone-kit-mobile
-          path: out/phone-kit-mobile-0.1-beta.apk
-      - name: Черновик пре-релиза mobile-v0.1-beta (публикует владелец)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+          path: out/phone-kit-mobile-*.apk
+      - name: Черновик пре-релиза mobile-v<версия> (публикует владелец)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=mobile-v0.1-beta
+          TAG="mobile-v$VER"
           D="$(gh release list --limit 100 --json tagName,isDraft -q ".[] | select(.tagName==\"$TAG\") | .isDraft")"
           if [ "$D" = "false" ]; then echo "$TAG уже опубликован — не трогаю"; exit 0; fi
           if [ "$D" = "true" ]; then gh release delete "$TAG" --yes; fi
           SUM="$(cut -c1-64 out/sha256.txt)"
-          python3 mobile/release_notes.py "$SUM" > "$RUNNER_TEMP/notes.md"
-          gh release create "$TAG" out/phone-kit-mobile-0.1-beta.apk --draft --prerelease --target "$GITHUB_SHA" \
-            --title "phone-kit Mobile 0.1 beta — чистка телефона без компьютера (Android 11+)" --notes-file "$RUNNER_TEMP/notes.md"
+          python3 mobile/release_notes.py "$SUM" "$VER" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "out/phone-kit-mobile-$VER.apk" --draft --prerelease --target "$GITHUB_SHA" \
+            --title "phone-kit Mobile $VER — чистка телефона без компьютера (Android 11+)" --notes-file "$RUNNER_TEMP/notes.md"
 
   mobile-emulator:
     name: phone-kit Mobile на эмуляторе (Android ${{ matrix.api }})
@@ -114,9 +116,34 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: bash tests/mobile/emu.sh out/phone-kit-mobile-0.1-beta.apk out/emu
+          script: bash tests/mobile/emu.sh out/emu
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: emu-${{ matrix.api }}
           path: out/emu
+
+  kit-release:
+    name: Черновик релиза набора (phone-kit-<версия>.zip)
+    needs: [scenarios, windows-ps51]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Архив и черновик (публикует владелец)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="$(sed -n "s/^\$KitVersion = '\([0-9.]*\)'.*/\1/p" phonekit.ps1 | head -1)"
+          [ -n "$V" ] || { echo "нет \$KitVersion"; exit 1; }
+          TAG="v$V"
+          D="$(gh release list --limit 100 --json tagName,isDraft -q ".[] | select(.tagName==\"$TAG\") | .isDraft")"
+          if [ "$D" = "false" ]; then echo "$TAG уже опубликован — не трогаю"; exit 0; fi
+          if [ "$D" = "true" ]; then gh release delete "$TAG" --yes; fi
+          python3 dev/build_kit_zip.py "out/phone-kit-$V.zip"
+          SUM="$(sha256sum "out/phone-kit-$V.zip" | cut -c1-64)"; echo "SHA-256 $SUM"
+          python3 dev/kit_release.py notes "$V" "$SUM" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "out/phone-kit-$V.zip" --draft --target "$GITHUB_SHA" \
+            --title "$(python3 dev/kit_release.py title "$V")" --notes-file "$RUNNER_TEMP/notes.md"

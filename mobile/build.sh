@@ -15,8 +15,9 @@ SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 BT="$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)"
 PLAT="$(ls -d "$SDK"/platforms/android-* | grep -E '/android-[0-9]+$' | sort -V | tail -1)"
 JAR="$PLAT/android.jar"
-VCODE="${MOBILE_VERSION_CODE:-1}"
-VNAME="${MOBILE_VERSION_NAME:-0.1-beta}"
+# версия — из Engine.VERSION («0.2-beta» -> versionName 0.2-beta, versionCode 2)
+VNAME="${MOBILE_VERSION_NAME:-$(sed -n 's/.*String VERSION = "\([^"]*\)".*/\1/p' "$HERE/src/net/zherdyev/phonekit/Engine.java")}"
+VCODE="${MOBILE_VERSION_CODE:-$((10#$(echo "$VNAME" | sed 's/-.*//; s/[^0-9]//g')))}"
 echo "build-tools: $BT"; echo "platform: $PLAT"
 python3 "$ROOT/dev/gen_mobile_patterns.py" --check
 grep -q "VERSION = \"$VNAME\"" "$HERE/src/net/zherdyev/phonekit/Engine.java" || { echo "Engine.VERSION != $VNAME"; exit 1; }

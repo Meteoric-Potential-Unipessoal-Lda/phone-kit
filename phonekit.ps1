@@ -49,7 +49,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $script:BoundArgs = @{}; foreach ($k in $PSBoundParameters.Keys) { $script:BoundArgs[$k] = $PSBoundParameters[$k] }
 $script:UpdateInfo = $null
-$KitVersion = '1.4'
+$KitVersion = '1.5'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -1190,8 +1190,14 @@ $KeepBgPattern = 'photo|gallery|drive|cloud|music|spotify|podcast|radio|navi|map
 # Чистильщики/ускорители — обычно реклама, пользы нет
 $CleanerPattern = 'clean|booster|boost|speed(up|er)|junk|cooler|cpu\.?cool|battery\.?(saver|doctor)|antivirus|virus|optimi[sz]er|ram\.?(clean|boost)|fast\.?charg'
 # Магазины приложений
-$StoreInstallers = '^(com\.android\.vending|com\.xiaomi\.discover|com\.sec\.android\.app\.samsungapps|com\.xiaomi\.(mipicks|market)|com\.huawei\.appmarket|com\.hihonor\.appmarket|com\.heytap\.market|com\.oppo\.market|com\.bbk\.appstore|com\.amazon\.venezia|com\.google\.android\.feedback|ru\.vk\.store|com\.transsion\.\w*store\w*|com\.motorola\.\w+)$'
+$StoreInstallers = '^(com\.android\.vending|com\.xiaomi\.discover|com\.sec\.android\.app\.samsungapps|com\.xiaomi\.(mipicks|market)|com\.huawei\.appmarket|com\.hihonor\.appmarket|com\.heytap\.market|com\.oppo\.market|com\.bbk\.appstore|com\.amazon\.venezia|com\.google\.android\.feedback|ru\.vk\.store|org\.fdroid\.\w+|com\.looker\.droidify|com\.machiav3lli\.fdroid|com\.aurora\.store|dev\.imranr\.obtainium|com\.transsion\.\w*store\w*|com\.motorola\.\w+)$'
 $FileInstallers = 'packageinstaller'
+# Кто ставит приложения производителя (предустановка, Good Lock, языковые пакеты), а не человек; packageinstaller (установка файлом) сюда не входит
+$PreloadInstallers = 'preload|preinstall|^android$|omcagent|carrier|^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\.'
+# Известные приложения, которые часто ставят файлом (банки, госуслуги, VPN, свои): не «подозрительные», если нет спецвозможностей/администратора
+# Игры со словом clean в названии (ASMR-уборка, makeover) — не чистильщики
+$NotCleaner = 'asmr|game|makeover|tycoon|simulator|idle'
+$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|tvcleanzer|zherdyev|^com\.aefyr\.sai'
 
 # ----------------------------------------------------------------- изменения: оптимизация и откат
 
@@ -2626,7 +2632,9 @@ $keepSet = New-Object 'System.Collections.Generic.HashSet[string]'
 foreach ($x in $roleSet) { [void]$keepSet.Add($x) }
 foreach ($x in @($a11yPkgs + $nlsPkgs + $adminPkgs)) { [void]$keepSet.Add($x) }
 $script:keepSet = $roleSet   # для Disable-Pkg -Third (подозрительные сторонние) проверяем только роли
-$kids = ($all.Contains('com.google.android.apps.kids.familylinkhelper') -or $roles.ContainsKey('android.app.role.SYSTEM_SUPERVISION') -or ($dpTxt -match '(?i)supervision|kids') -or $all.Contains('com.sec.android.app.kidshome'))
+# Детское устройство — только по признакам использования: родительский контроль как администратор устройства или детский режим открывали.
+# Samsung Kids и роль SYSTEM_SUPERVISION есть почти на любом телефоне — сами по себе ничего не значат (ложное срабатывание на Galaxy S24).
+$kids = (@($adminPkgs | Where-Object { $_ -match '(?i)supervision|familylink' }).Count -gt 0) -or $usedPkgs.Contains('com.sec.android.app.kidshome') -or $usedPkgs.Contains('com.google.android.apps.kids.familylinkhelper') -or $usedPkgs.Contains('com.coloros.childrenspace')
 $launchOk = ($launchable.Count -ge 5)
 
 # --- кандидаты: включённые системные пакеты из базы
@@ -2672,7 +2680,9 @@ foreach ($pkg in $third) {
   if ($disabled.Contains($pkg)) { continue }   # уже отключено — значка нет, работать не может
   $strong = @(); $weak = @(); $side = $false
   $inst = [string]$installer[$pkg]
-  $preinst = ($inst -eq 'android' -or ((-not $inst -or $inst -eq 'null') -and $uad[$pkg]))   # поставлено производителем
+  $preinst = ($inst -eq 'android' -or ($inst -match $PreloadInstallers -and $inst -notmatch $FileInstallers) -or ((-not $inst -or $inst -eq 'null') -and $uad[$pkg]))   # поставлено производителем
+  $nameKnown = ($pkg -match $KnownSideload -or $pkg -match $StoreInstallers)   # сами магазины (RuStore, F-Droid) ставят приложения — это их работа
+  $known = ($nameKnown -or $usedPkgs.Contains($pkg))   # банк/госуслуги/VPN или им пользуются — владелец его знает
   if ($a11yPkgs -contains $pkg) { $strong += (L 'm310') }
   if ($adminPkgs -contains $pkg) { $strong += (L 'm311') }
   $webapk = ($pkg -like 'org.chromium.webapk.*')
@@ -2687,11 +2697,12 @@ foreach ($pkg in $third) {
   if ($nlsPkgs -contains $pkg) { $weak += (L 'm316') }
   if ($overlayPkgs -contains $pkg) { $weak += (L 'm317') }
   if ($installPkgs -contains $pkg) { $weak += (L 'm318') }
-  $cleaner = ($pkg -match $CleanerPattern)
+  $cleaner = ($pkg -match $CleanerPattern -and $pkg -notmatch $NotCleaner -and -not $nameKnown)
   if ($cleaner) { $strong += (L 'm319') }
   $lvl = ''
   if ($strong.Count -ge 2 -or ($side -and $weak.Count -ge 1) -or $cleaner) { $lvl = 'warn' }
   elseif ($strong.Count -ge 1 -or ($weak.Count -ge 2 -and $inst -notmatch $StoreInstallers)) { $lvl = 'check' }
+  if ($lvl -eq 'warn' -and $known -and -not $cleaner -and -not ($a11yPkgs -contains $pkg) -and -not ($adminPkgs -contains $pkg)) { $lvl = 'check' }
   if ($webapk) { $lvl = 'check'; $weak += (L 'm320') }
   if ($lvl) { $susp += [pscustomobject]@{ Pkg = $pkg; Level = $lvl; Why = (($strong + $weak) -join '; '); Used = $usedPkgs.Contains($pkg); Mb = (Get-PkgRssMb $pkg) } }
 }

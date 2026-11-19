@@ -30,6 +30,15 @@ expect s_diag 'Архив:'
 expect s_diag 'подозрительное: com.hidden.spy.svc'
 expect s_diag 'Отчёт для клиента:'
 reject s_diag 'Exception'
+# банк, поставленный файлом, и предустановленный Samsung Kids — не «подозрительные»; Samsung Kids сам по себе — не детский телефон
+reject s_diag 'подозрительное: ru.sberbankmobile'
+reject s_diag 'подозрительное: com.sec.android.app.kidshome'
+reject s_diag 'Детское устройство'
+reject s_diag 'подозрительное: ru.vk.store'
+reject s_diag 'подозрительное: com.samsung.android.app.homestar'
+reject s_diag 'подозрительное: com.housecleaning.asmr.makeover.home'
+MOCK_KIDS=1 run s_kids samsung '1\nТест\n'
+expect s_kids 'Детское устройство'
 nostate samsung 'rubin'
 
 # 2. Samsung: оптимизация по умолчанию + перезагрузка с проверкой, затем откат

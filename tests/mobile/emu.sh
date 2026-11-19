@@ -1,8 +1,8 @@
 #!/bin/bash
 # phone-kit Mobile на настоящем Android (эмулятор в CI): установка APK, запуск, нет ли падения, снимок экрана.
-# bash tests/mobile/emu.sh путь.apk папка_для_результатов
+# bash tests/mobile/emu.sh папка_для_результатов [путь.apk] (по умолчанию out/phone-kit-mobile-*.apk)
 set -u
-APK="$1"; OUT="${2:-out}"; mkdir -p "$OUT"
+OUT="${1:-out/emu}"; APK="${2:-$(ls out/phone-kit-mobile-*.apk | head -1)}"; mkdir -p "$OUT"
 P=net.zherdyev.phonekit
 adb wait-for-device
 echo "Android $(adb shell getprop ro.build.version.release | tr -d '\r') (SDK $(adb shell getprop ro.build.version.sdk | tr -d '\r'))"

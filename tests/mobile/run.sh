@@ -63,6 +63,13 @@ reject m_sam 'ITEM [x] disable com.google.android.gm'
 reject m_sam 'disable com.android.systemui'
 reject m_sam 'disable com.whatsapp'
 reject m_sam 'a101'
+reject m_sam 'third ru.sberbankmobile'
+reject m_sam 'third com.sec.android.app.kidshome'
+reject m_sam 'Детское устройство'
+reject m_sam 'third ru.vk.store'
+reject m_sam 'third com.samsung.android.app.homestar'
+reject m_sam 'third com.housecleaning.asmr.makeover.home'
+expect m_sam 'Установлены не из магазина и имеют особые доступы: com.hidden.spy.svc, com.super.cleaner.booster —'
 clean m_sam
 python3 -c "import json,sys; s=json.load(open('$WORK/samsung.json')); sys.exit(0 if s['disabled']==['com.samsung.android.app.watchmanagerstub'] and not s['uninst'] else 1)" && echo "PASS m_sam: после отката всё как было" || { echo "FAIL m_sam: после отката не как было"; FAIL=1; }
 
@@ -91,6 +98,7 @@ mock samsung; MOCK_BIG=300 cli m_big --mock --mode diag; expect m_big 'ITEM '; c
 mock samsung; cli m_uk --mock --mode diag --lang uk; expect m_uk 'Вимкнути com.samsung.android.rubin.app'; expect m_uk 'Реклама та збір даних у прошивці'
 mock samsung; cli m_en --mock --mode diag --lang en; expect m_en 'Disable com.samsung.android.rubin.app'; expect m_en 'Firmware ads and data collection'
 mock samsung; cli m_de --mock --mode diag --lang de; expect m_de 'ITEM '; clean m_de
+mock samsung; MOCK_KIDS=1 cli m_kids --mock --mode diag; expect m_kids 'OBS Детское устройство'
 
 # 5. Протокол ADB: новый ключ -> «Разрешить» -> CNXN; ответы многими кусками WRTE
 PORT=$((20000 + RANDOM % 20000))
