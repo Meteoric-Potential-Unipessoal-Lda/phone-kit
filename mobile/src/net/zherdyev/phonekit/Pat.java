@@ -15,7 +15,7 @@ final class Pat {
   static final Pattern StoreInstallers = ci("^(com\\.android\\.vending|com\\.xiaomi\\.discover|com\\.sec\\.android\\.app\\.samsungapps|com\\.xiaomi\\.(mipicks|market)|com\\.huawei\\.appmarket|com\\.hihonor\\.appmarket|com\\.heytap\\.market|com\\.oppo\\.market|com\\.bbk\\.appstore|com\\.amazon\\.venezia|com\\.google\\.android\\.feedback|ru\\.vk\\.store|org\\.fdroid\\.\\w+|com\\.looker\\.droidify|com\\.machiav3lli\\.fdroid|com\\.aurora\\.store|dev\\.imranr\\.obtainium|com\\.transsion\\.\\w*store\\w*|com\\.motorola\\.\\w+)$");
   static final Pattern FileInstallers = ci("packageinstaller");
   static final Pattern PreloadInstallers = ci("preload|preinstall|^android$|omcagent|carrier|^com\\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\\.");
-  static final Pattern KnownSideload = ci("^com\\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\\.vk\\.|^com\\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|tvcleanzer|zherdyev|^com\\.aefyr\\.sai");
+  static final Pattern KnownSideload = ci("^com\\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\\.vk\\.|^com\\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|cleanzer|zherdyev|telegram|^com\\.aefyr\\.sai");
   static final Pattern NotCleaner = ci("asmr|game|makeover|tycoon|simulator|idle");
   static final Pattern[] PROTECTED = {
     ci("^android$"),

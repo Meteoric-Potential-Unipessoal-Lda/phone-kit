@@ -406,7 +406,7 @@ public final class Engine {
     step(L.t("m291"));
     String crashTxt = S("logcat -d -b crash -t 400");
     Map<String, Integer> crashes = new HashMap<String, Integer>();
-    Matcher crm = Pattern.compile("Process: ([A-Za-z0-9_.:]+)").matcher(crashTxt);
+    Matcher crm = Pattern.compile("Process: ([A-Za-z][A-Za-z0-9_]*\\.[A-Za-z0-9_.:]+)").matcher(crashTxt);
     while (crm.find()) { Integer c = crashes.get(crm.group(1)); crashes.put(crm.group(1), c == null ? 1 : c + 1); }
 
     int rssi = 0;

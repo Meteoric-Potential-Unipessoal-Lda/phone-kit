@@ -1197,7 +1197,7 @@ $PreloadInstallers = 'preload|preinstall|^android$|omcagent|carrier|^com\.(samsu
 # Известные приложения, которые часто ставят файлом (банки, госуслуги, VPN, свои): не «подозрительные», если нет спецвозможностей/администратора
 # Игры со словом clean в названии (ASMR-уборка, makeover) — не чистильщики
 $NotCleaner = 'asmr|game|makeover|tycoon|simulator|idle'
-$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|tvcleanzer|zherdyev|^com\.aefyr\.sai'
+$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|cleanzer|zherdyev|telegram|^com\.aefyr\.sai'
 
 # ----------------------------------------------------------------- изменения: оптимизация и откат
 
@@ -2599,7 +2599,7 @@ $crashTxt = Sh 'logcat -d -b crash -t 400'
 Save-Raw 'crash_log.txt' $crashTxt
 $crashes = @{}
 foreach ($l in ($crashTxt -split "`n")) {
-  if ($l -match 'Process: ([A-Za-z0-9_.:]+)') { $k = $Matches[1]; if ($crashes.ContainsKey($k)) { $crashes[$k]++ } else { $crashes[$k] = 1 } }
+  if ($l -match 'Process: ([A-Za-z][A-Za-z0-9_]*\.[A-Za-z0-9_.:]+)') { $k = $Matches[1]; if ($crashes.ContainsKey($k)) { $crashes[$k]++ } else { $crashes[$k] = 1 } }
 }
 $oomBitmap = ($crashTxt -match 'OutOfMemoryError' -and $crashTxt -match '(?i)bitmap')
 
