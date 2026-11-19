@@ -68,6 +68,8 @@ reject m_sam 'third com.sec.android.app.kidshome'
 reject m_sam 'Детское устройство'
 reject m_sam 'third ru.vk.store'
 reject m_sam 'third com.samsung.android.app.homestar'
+reject m_sam 'third com.monotype.android.font.oppobigsans'
+reject m_sam 'third com.android.samsung.utilityagent'
 reject m_sam 'third com.housecleaning.asmr.makeover.home'
 expect m_sam 'Установлены не из магазина и имеют особые доступы: com.hidden.spy.svc, com.super.cleaner.booster —'
 clean m_sam
@@ -78,6 +80,7 @@ mock xiaomi
 cli m_mi --mock --mode both --kinds anim,disable,bg,dns --journal "$WORK/mi.tsv"
 expect m_mi 'HyperOS'
 reject m_mi 'bg com.google.android.verifier'
+reject m_mi 'third com.mobiletrendyapps.speaker.cleaner.remove.water'
 expect m_mi 'ITEM [x] disable com.miui.msa.global | Реклама и сбор данных в прошивке'
 expect m_mi 'убран для пользователя com.miui.msa.global'
 expect m_mi 'возвращён com.miui.msa.global'

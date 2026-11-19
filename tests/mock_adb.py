@@ -94,8 +94,8 @@ third = {'com.whatsapp': 'com.android.vending', 'org.telegram.messenger': 'com.a
   'com.hidden.spy.svc': 'com.android.packageinstaller', 'com.oldgame.idle': 'com.android.vending', 'org.chromium.webapk.a550a015e23cabaf4_v2': 'com.android.chrome',
   'com.booking': 'null', 'ru.sberbankmobile': 'com.google.android.packageinstaller', 'com.housecleaning.asmr.makeover.home': 'com.android.vending', 'ru.vk.store': 'com.google.android.packageinstaller'}
 # Samsung Kids: предустановлен почти на всех Galaxy (ставит preloadinstaller) — не «подозрительный» и не признак детского телефона
-if brand == 'xiaomi': third['com.google.android.verifier'] = 'com.android.vending'   # Play Защита (на кастомных прошивках — как обычное приложение)
-if brand == 'samsung': third.update({'com.sec.android.app.kidshome': 'com.sec.android.preloadinstaller', 'com.samsung.android.app.homestar': 'com.samsung.android.goodlock'})
+if brand == 'xiaomi': third.update({'com.google.android.verifier': 'com.android.vending', 'com.mobiletrendyapps.speaker.cleaner.remove.water': 'com.android.vending'})   # Play Защита (на кастомных прошивках — как обычное приложение)
+if brand == 'samsung': third.update({'com.sec.android.app.kidshome': 'com.sec.android.preloadinstaller', 'com.samsung.android.app.homestar': 'com.samsung.android.goodlock', 'com.monotype.android.font.oppobigsans': 'com.zfont.app', 'com.android.samsung.utilityagent': 'com.android.shell'})
 launch = ['com.whatsapp', 'org.telegram.messenger', 'com.super.cleaner.booster', 'com.oldgame.idle', 'org.chromium.webapk.a550a015e23cabaf4_v2', 'com.booking',
   'com.google.android.youtube', 'com.google.android.gm', 'com.android.chrome', 'com.android.settings', 'com.android.vending', 'com.sec.android.app.sbrowser',
   'com.miui.player', 'com.mi.globalbrowser', 'com.xiaomi.mipicks', 'com.google.android.dialer', 'com.google.android.apps.messaging']
