@@ -1193,11 +1193,11 @@ $CleanerPattern = 'clean|booster|boost|speed(up|er)|junk|cooler|cpu\.?cool|batte
 $StoreInstallers = '^(com\.android\.vending|com\.xiaomi\.discover|com\.sec\.android\.app\.samsungapps|com\.xiaomi\.(mipicks|market)|com\.huawei\.appmarket|com\.hihonor\.appmarket|com\.heytap\.market|com\.oppo\.market|com\.bbk\.appstore|com\.amazon\.venezia|com\.google\.android\.feedback|ru\.vk\.store|org\.fdroid\.\w+|com\.looker\.droidify|com\.machiav3lli\.fdroid|com\.aurora\.store|dev\.imranr\.obtainium|com\.transsion\.\w*store\w*|com\.motorola\.\w+)$'
 $FileInstallers = 'packageinstaller'
 # Кто ставит приложения производителя (предустановка, Good Lock, языковые пакеты), а не человек; packageinstaller (установка файлом) сюда не входит
-$PreloadInstallers = 'preload|preinstall|^android$|omcagent|carrier|^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\.'
+$PreloadInstallers = 'preload|preinstall|^android$|omcagent|carrier|^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor|transsion)\.'
 # Известные приложения, которые часто ставят файлом (банки, госуслуги, VPN, свои): не «подозрительные», если нет спецвозможностей/администратора
 # Игры со словом clean в названии (ASMR-уборка, makeover) — не чистильщики
 $NotCleaner = 'asmr|game|makeover|tycoon|simulator|idle'
-$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor)\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|cleanzer|zherdyev|telegram|^com\.aefyr\.sai'
+$KnownSideload = '^com\.(samsung|sec|miui|xiaomi|oplus|coloros|heytap|huawei|hihonor|transsion)\.|bank|sber|tinkoff|tbank|alfabank|vtb|gazprom|raiffeisen|sovcom|pochta|ozon|wildberries|avito|yandex|^ru\.vk\.|^com\.vkontakte|oneme|gosuslugi|happ|v2ray|nekobox|hiddify|outline|wireguard|vpn|cleanzer|cleanyour|tvvoicesearch|zherdyev|telegram|^com\.aefyr\.sai'
 
 # ----------------------------------------------------------------- изменения: оптимизация и откат
 
