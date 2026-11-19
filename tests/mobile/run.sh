@@ -77,6 +77,7 @@ python3 -c "import json,sys; s=json.load(open('$WORK/samsung.json')); sys.exit(0
 mock xiaomi
 cli m_mi --mock --mode both --kinds anim,disable,bg,dns --journal "$WORK/mi.tsv"
 expect m_mi 'HyperOS'
+reject m_mi 'bg com.google.android.verifier'
 expect m_mi 'ITEM [x] disable com.miui.msa.global | Реклама и сбор данных в прошивке'
 expect m_mi 'убран для пользователя com.miui.msa.global'
 expect m_mi 'возвращён com.miui.msa.global'

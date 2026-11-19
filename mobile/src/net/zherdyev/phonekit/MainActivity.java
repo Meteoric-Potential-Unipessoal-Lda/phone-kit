@@ -177,7 +177,10 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
   }
 
   void openDevSettings() {
-    try { startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)); }
+    // подсветить пункт «Беспроводная отладка» (ключ настройки в AOSP — toggle_adb_wireless; где не поддерживается — просто откроется раздел)
+    Bundle args = new Bundle();
+    args.putString(":settings:fragment_args_key", "toggle_adb_wireless");
+    try { startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).putExtra(":settings:fragment_args_key", "toggle_adb_wireless").putExtra(":settings:show_fragment_args", args)); }
     catch (Exception e) { try { startActivity(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)); } catch (Exception ignored) {} }
   }
 
@@ -325,6 +328,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     if (journal != null && !journal.entries.isEmpty())
       button(L.t("x044") + " — " + L.t("x045", journal.created, journal.entries.size()), false, new View.OnClickListener() { public void onClick(View v) { showRollback(); } });
     button(L.t("x046"), false, new View.OnClickListener() { public void onClick(View v) { share(); } });
+    button(L.t("x077"), false, new View.OnClickListener() { public void onClick(View v) { copyReport(); } });
     button(L.t("x047"), false, new View.OnClickListener() {
       public void onClick(View v) { if (conn != null) conn.close(); conn = null; eng = null; showHome(L.t("x048")); }
     });
@@ -415,6 +419,7 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     if (!rolledBack && journal != null && !journal.entries.isEmpty())
       button(L.t("x044"), false, new View.OnClickListener() { public void onClick(View v) { confirmRollback(null); } });
     button(L.t("x046"), false, new View.OnClickListener() { public void onClick(View v) { share(); } });
+    button(L.t("x077"), false, new View.OnClickListener() { public void onClick(View v) { copyReport(); } });
     button(L.t("x069"), true, back());
     scrollDown();
   }
@@ -487,7 +492,16 @@ public class MainActivity extends Activity implements SharedPreferences.OnShared
     i.setType("text/plain");
     i.putExtra(Intent.EXTRA_SUBJECT, L.t("x150", Engine.VERSION) + " — " + eng.model);
     i.putExtra(Intent.EXTRA_TEXT, eng.reportText(journal));
-    try { startActivity(Intent.createChooser(i, L.t("x046"))); } catch (Exception ignored) {}
+    // не открылось окно «Поделиться» (так бывает на некоторых Xiaomi) — кладём отчёт в буфер обмена
+    try { startActivity(Intent.createChooser(i, L.t("x046"))); } catch (Exception e) { copyReport(); }
+  }
+
+  void copyReport() {
+    try {
+      android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+      cm.setPrimaryClip(android.content.ClipData.newPlainText(L.t("x150", Engine.VERSION), eng.reportText(journal)));
+      toastMsg(L.t("x078"));
+    } catch (Exception e) { toastMsg(String.valueOf(e.getMessage())); }
   }
 
   // ---------------------------------------------------------------- вид

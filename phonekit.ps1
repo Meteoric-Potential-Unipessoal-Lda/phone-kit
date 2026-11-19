@@ -49,7 +49,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $script:BoundArgs = @{}; foreach ($k in $PSBoundParameters.Keys) { $script:BoundArgs[$k] = $PSBoundParameters[$k] }
 $script:UpdateInfo = $null
-$KitVersion = '1.5'
+$KitVersion = '1.5.1'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 $Root = $PSScriptRoot
 if (-not $Root) { $Root = (Get-Location).Path }
@@ -1184,8 +1184,8 @@ $AskPattern = 'assistant|voice|speech|hotword|bixby|music|video|youtube|netflix|
 # Явный мусор (реклама, аналитика, сбор данных, партнёрские заглушки, тесты, снятые с поддержки) — по умолчанию отмечается
 $AutoPattern = '(^|\W)ads?(\W|$)|advert|adservice|analytic|telemetry|tracking|spyware|collect|statistic|(^|\W)metrics?(\W|$)|recommend|partner|stub|promo|facebook|netflix|booking|linkedin|yahoo|flipboard|empty package|useless|discontinued|(^|\W)test|debug|hidden|diagnos|logging|logger|log collect|bug ?report|feedback|easter egg|china|chinese|korea|japan|verizon|t-mobile|sprint|preload|retail demo|tips|tutorial|user guide|user manual|ar zone|ar emoji|ar doodle|deco pic|sticker|news|shop|ecomm|community|forum|loan|(^|\W)vr(\W|$)|daydream|cardboard|yellow ?page|customi[sz]ation|visit in|(^|[._])msa([._]|$)|miui daemon|onetrack|vipaccount|o2o|youpin|mirecycle|quick apps|hybrid|app vault|minusscreen|taplus|carousel'
 
-# Сторонние приложения, которым НЕ ограничиваем фон даже если ими не пользовались
-$KeepBgPattern = 'photo|gallery|drive|cloud|music|spotify|podcast|radio|navi|maps|fit|sleep|whatsapp|telegram|viber|signal|messenger|orca|skype|zoom|teams|slack|discord|wechat|kakao|line\.android|bank|pay|wallet|money|finance|card|auth|otp|2fa|alarm|clock|calendar|kid|family|parent|life360|findmy|tracker|health|medic|vpn|keyboard|launcher|sms|dialer|call|contacts|mail|outlook|gmail|sync|backup|antivirus|security'
+# Сторонние приложения, которым НЕ ограничиваем фон даже если ими не пользовались (и компоненты Google/Android: Play Защита и т.п.)
+$KeepBgPattern = 'photo|gallery|drive|cloud|music|spotify|podcast|radio|navi|maps|fit|sleep|whatsapp|telegram|viber|signal|messenger|orca|skype|zoom|teams|slack|discord|wechat|kakao|line\.android|bank|pay|wallet|money|finance|card|auth|otp|2fa|alarm|clock|calendar|kid|family|parent|life360|findmy|tracker|health|medic|vpn|keyboard|launcher|sms|dialer|call|contacts|mail|outlook|gmail|sync|backup|antivirus|security|verifier|^com\.google\.android\.|^com\.android\.'
 
 # Чистильщики/ускорители — обычно реклама, пользы нет
 $CleanerPattern = 'clean|booster|boost|speed(up|er)|junk|cooler|cpu\.?cool|battery\.?(saver|doctor)|antivirus|virus|optimi[sz]er|ram\.?(clean|boost)|fast\.?charg'

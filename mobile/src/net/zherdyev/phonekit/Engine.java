@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * с проверкой рабочего стола / Настроек / клавиатуры / SystemUI и откат по журналу. Без android.* — тестируется на обычной Java (tests/mobile).
  */
 public final class Engine {
-  public static final String VERSION = "0.2-beta";
+  public static final String VERSION = "0.2.1-beta";
   /** Само приложение: никогда не отключаем и не ограничиваем — иначе оборвём себе связь. */
   public static final String SELF = "net.zherdyev.phonekit";
   public static final int INFO = 0, OK = 1, WARN = 2, BAD = 3;
