@@ -56,6 +56,7 @@ nostate samsung 'rubin'
 # 3. Xiaomi: прошивка не даёт отключить -> убрать для пользователя 0, DNS, затем откат
 run x_opt xiaomi '2\nРедми\n4\n\nда\n\n\n'
 reject x_opt 'Запретить работу в фоне: com.google.android.verifier'
+reject x_opt 'Запретить работу в фоне: pro.vitalii.andropods'
 reject x_opt 'подозрительное: com.mobiletrendyapps.speaker.cleaner.remove.water'
 expect x_opt 'убран для пользователя com.miui.msa.global'
 expect x_opt 'частный DNS -> dns.adguard-dns.com'

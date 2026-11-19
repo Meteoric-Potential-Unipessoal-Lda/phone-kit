@@ -94,7 +94,7 @@ third = {'com.whatsapp': 'com.android.vending', 'org.telegram.messenger': 'com.a
   'com.hidden.spy.svc': 'com.android.packageinstaller', 'com.oldgame.idle': 'com.android.vending', 'org.chromium.webapk.a550a015e23cabaf4_v2': 'com.android.chrome',
   'com.booking': 'null', 'ru.sberbankmobile': 'com.google.android.packageinstaller', 'com.housecleaning.asmr.makeover.home': 'com.android.vending', 'ru.vk.store': 'com.google.android.packageinstaller'}
 # Samsung Kids: предустановлен почти на всех Galaxy (ставит preloadinstaller) — не «подозрительный» и не признак детского телефона
-if brand == 'xiaomi': third.update({'com.google.android.verifier': 'com.android.vending', 'com.mobiletrendyapps.speaker.cleaner.remove.water': 'com.android.vending'})   # Play Защита (на кастомных прошивках — как обычное приложение)
+if brand == 'xiaomi': third.update({'com.google.android.verifier': 'com.android.vending', 'com.mobiletrendyapps.speaker.cleaner.remove.water': 'com.android.vending', 'pro.vitalii.andropods': 'com.android.vending'})   # Play Защита (на кастомных прошивках — как обычное приложение)
 if brand == 'samsung': third.update({'com.sec.android.app.kidshome': 'com.sec.android.preloadinstaller', 'com.samsung.android.app.homestar': 'com.samsung.android.goodlock', 'com.monotype.android.font.oppobigsans': 'com.zfont.app', 'com.android.samsung.utilityagent': 'com.android.shell'})
 launch = ['com.whatsapp', 'org.telegram.messenger', 'com.super.cleaner.booster', 'com.oldgame.idle', 'org.chromium.webapk.a550a015e23cabaf4_v2', 'com.booking',
   'com.google.android.youtube', 'com.google.android.gm', 'com.android.chrome', 'com.android.settings', 'com.android.vending', 'com.sec.android.app.sbrowser',
@@ -131,7 +131,7 @@ def shell(cmd):
         return '1600000' if 'max' in cmd else '900000'
     if cmd == 'df -k /data': return 'Filesystem     1K-blocks     Used Available Use% Mounted on\n/dev/block/dm-5 25000000 22500000 2500000  90% /data'
     if cmd == 'ps -A -o RSS,NAME':
-        return 'RSS NAME\n' + ('40000 com.google.android.verifier\n' if brand == 'xiaomi' else '') + '250000 system_server\n180000 com.android.systemui\n120000 com.samsung.android.rubin.app\n90000 com.oldgame.idle\n60000 com.hidden.spy.svc\n150000 com.whatsapp\n70000 com.miui.msa.global\n500000 com.android.chrome'
+        return 'RSS NAME\n' + ('40000 com.google.android.verifier\n30000 pro.vitalii.andropods\n' if brand == 'xiaomi' else '') + '250000 system_server\n180000 com.android.systemui\n120000 com.samsung.android.rubin.app\n90000 com.oldgame.idle\n60000 com.hidden.spy.svc\n150000 com.whatsapp\n70000 com.miui.msa.global\n500000 com.android.chrome'
     if cmd.startswith('pidof'): return '1234'
     if cmd == 'dumpsys cpuinfo': return 'Load: 6.1 / 5.8 / 5.5\nCPU usage from 1000ms\n  25% 1000/system_server: 10% user + 15% kernel\n  12% 2000/com.android.chrome: 8% user\n45% TOTAL: 30% user + 15% kernel'
     if cmd == 'dumpsys battery': return 'Current Battery Service state:\n  AC powered: false\n  USB powered: true\n  level: 64\n  temperature: 412\n  health: 2'

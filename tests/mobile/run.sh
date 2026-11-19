@@ -80,6 +80,7 @@ mock xiaomi
 cli m_mi --mock --mode both --kinds anim,disable,bg,dns --journal "$WORK/mi.tsv"
 expect m_mi 'HyperOS'
 reject m_mi 'bg com.google.android.verifier'
+reject m_mi 'bg pro.vitalii.andropods'
 reject m_mi 'third com.mobiletrendyapps.speaker.cleaner.remove.water'
 expect m_mi 'ITEM [x] disable com.miui.msa.global | Реклама и сбор данных в прошивке'
 expect m_mi 'убран для пользователя com.miui.msa.global'
